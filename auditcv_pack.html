@@ -1,0 +1,878 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8"/>
+<title>AUDITCV — Empacotador GitHub</title>
+<style>
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{font-family:'Segoe UI',sans-serif;background:#0B1120;color:#E5E7EB;min-height:100vh;padding:40px 20px;display:flex;flex-direction:column;align-items:center;gap:24px}
+  h1{font-size:1.6rem;background:linear-gradient(135deg,#F5B041,#FDE68A);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text}
+  p.sub{color:#9CA3AF;font-size:.9rem}
+  .card{background:rgba(31,41,55,.6);border:1px solid rgba(245,176,65,.2);border-radius:16px;padding:28px;width:100%;max-width:680px}
+  .card h2{font-size:1rem;color:#F5B041;margin-bottom:16px;display:flex;align-items:center;gap:8px}
+  .file-list{display:flex;flex-direction:column;gap:8px}
+  .file-row{display:flex;align-items:center;justify-content:space-between;background:rgba(0,0,0,.3);border-radius:10px;padding:10px 14px;font-size:.85rem}
+  .file-row span{color:#9CA3AF}
+  .badge-ok{background:rgba(16,185,129,.15);color:#34D399;border:1px solid rgba(16,185,129,.3);padding:2px 10px;border-radius:999px;font-size:.75rem;font-weight:700}
+  .btn{display:inline-flex;align-items:center;gap:8px;padding:12px 28px;border-radius:10px;font-size:.95rem;font-weight:700;cursor:pointer;border:none;transition:all .25s}
+  .btn-primary{background:linear-gradient(135deg,#F5B041,#C8922A);color:#0B1120;box-shadow:0 0 20px rgba(245,176,65,.3)}
+  .btn-primary:hover{transform:translateY(-2px);box-shadow:0 0 32px rgba(245,176,65,.5)}
+  .btn-outline{background:transparent;border:1px solid rgba(245,176,65,.3);color:#F5B041}
+  .btn-outline:hover{background:rgba(245,176,65,.1)}
+  .actions{display:flex;gap:12px;flex-wrap:wrap;justify-content:center}
+  .progress{width:100%;background:rgba(255,255,255,.06);border-radius:999px;height:6px;overflow:hidden}
+  .progress-bar{height:100%;background:linear-gradient(90deg,#F5B041,#FDE68A);border-radius:999px;transition:width .4s ease;width:0%}
+  .log{font-size:.8rem;color:#9CA3AF;max-height:120px;overflow-y:auto;line-height:1.8}
+  .log span{display:block}
+  .log .ok{color:#34D399}
+  .log .info{color:#F5B041}
+  footer{color:#4B5563;font-size:.78rem;text-align:center}
+  .hint{font-size:.78rem;color:#6B7280;margin-top:12px;line-height:1.7}
+  .hint code{background:rgba(255,255,255,.08);padding:1px 6px;border-radius:4px;font-size:.76rem}
+</style>
+</head>
+<body>
+
+<h1>✦ AUDITCV — Empacotador GitHub</h1>
+<p class="sub">Gera todos os arquivos do projeto prontos para upload</p>
+
+<div class="card">
+  <h2>📁 Arquivos que serão gerados</h2>
+  <div class="file-list" id="file-list"></div>
+</div>
+
+<div class="card">
+  <h2>⚡ Ação</h2>
+  <div class="actions">
+    <button class="btn btn-primary" id="btn-dl" onclick="baixarTodos()">⬇ Baixar todos os arquivos</button>
+    <button class="btn btn-outline" onclick="baixarZip()">📦 Baixar como ZIP</button>
+  </div>
+  <div class="progress mt-16" id="prog-wrap" style="display:none"><div class="progress-bar" id="prog"></div></div>
+  <div class="log mt-16" id="log"></div>
+  <p class="hint mt-16">
+    Após baixar, suba para o GitHub:<br>
+    1. Crie o repositório em <code>github.com/new</code><br>
+    2. Arraste os arquivos para o repositório (ou use <code>git push</code>)<br>
+    3. Ative GitHub Pages em <code>Settings → Pages → main</code>
+  </p>
+</div>
+
+<footer>✦ AUDITCV Empacotador — use apenas para gerar os arquivos do projeto</footer>
+
+<!-- JSZip CDN -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+<script>
+// ─────────────────────────────────────────────
+// DEFINIÇÃO DOS ARQUIVOS
+// ─────────────────────────────────────────────
+const FILES = [
+  { path: 'assets/css/style.css',  label: 'CSS Global',        icon: '🎨', fn: getCSS    },
+  { path: 'assets/js/main.js',     label: 'JavaScript Global', icon: '⚙️', fn: getJS     },
+  { path: 'index.html',            label: 'Landing Page',      icon: '🏠', fn: getIndex  },
+  { path: 'login.html',            label: 'Login',             icon: '🔐', fn: getLogin  },
+  { path: 'dashboard.html',        label: 'Dashboard',         icon: '📊', fn: getDash   },
+  { path: 'gerador.html',          label: 'Gerador IA',        icon: '✨', fn: getGerador},
+  { path: 'perfil.html',           label: 'Perfil',            icon: '👤', fn: getPerfil },
+  { path: 'admin.html',            label: 'Admin (oculto)',    icon: '🔒', fn: getAdmin  },
+  { path: '404.html',              label: 'Página 404',        icon: '❓', fn: get404    },
+  { path: 'README.md',             label: 'README',            icon: '📄', fn: getReadme },
+];
+
+// Render lista
+const fl = document.getElementById('file-list');
+FILES.forEach(f => {
+  fl.innerHTML += `<div class="file-row"><span>${f.icon} <strong style="color:#E5E7EB">${f.path}</strong></span><span>${f.label}</span><span class="badge-ok">OK</span></div>`;
+});
+
+function log(msg, type='info'){
+  const l = document.getElementById('log');
+  l.innerHTML += `<span class="${type}">${msg}</span>`;
+  l.scrollTop = l.scrollHeight;
+}
+
+function download(filename, content){
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(new Blob([content],{type:'text/plain'}));
+  a.download = filename; a.click();
+}
+
+async function baixarTodos(){
+  const btn = document.getElementById('btn-dl');
+  btn.disabled = true; btn.textContent = 'Gerando...';
+  document.getElementById('prog-wrap').style.display='block';
+  document.getElementById('log').innerHTML='';
+  for(let i=0;i<FILES.length;i++){
+    const f = FILES[i];
+    document.getElementById('prog').style.width = ((i+1)/FILES.length*100)+'%';
+    log(`⬇ Gerando ${f.path}...`);
+    await sleep(120);
+    download(f.path.replace(/\//g,'_'), f.fn());
+    log(`✓ ${f.path} baixado`, 'ok');
+    await sleep(80);
+  }
+  btn.disabled=false; btn.textContent='⬇ Baixar todos os arquivos';
+  log('🎉 Todos os arquivos gerados! Reorganize nas pastas corretas.','info');
+}
+
+async function baixarZip(){
+  const btn = document.querySelectorAll('.btn-outline')[0];
+  btn.disabled=true; btn.textContent='Gerando ZIP...';
+  document.getElementById('prog-wrap').style.display='block';
+  document.getElementById('log').innerHTML='';
+  const zip = new JSZip();
+  for(let i=0;i<FILES.length;i++){
+    const f = FILES[i];
+    document.getElementById('prog').style.width = ((i+1)/FILES.length*100)+'%';
+    log(`📦 Adicionando ${f.path}...`);
+    zip.file(f.path, f.fn());
+    await sleep(60);
+  }
+  log('🔧 Comprimindo...','info');
+  const blob = await zip.generateAsync({type:'blob',compression:'DEFLATE',compressionOptions:{level:6}});
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = 'AUDITCV.zip'; a.click();
+  btn.disabled=false; btn.textContent='📦 Baixar como ZIP';
+  log('✅ AUDITCV.zip gerado com sucesso!','ok');
+}
+
+function sleep(ms){return new Promise(r=>setTimeout(r,ms));}
+
+// ─────────────────────────────────────────────
+// CONTEÚDO DOS ARQUIVOS
+// ─────────────────────────────────────────────
+
+function getCSS(){return `@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap');
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+:root{--bg:#0B1120;--bg2:#0F172A;--bg3:#1E293B;--gold:#F5B041;--gold-dim:#C8922A;--gold-glow:rgba(245,176,65,.15);--text:#E5E7EB;--text-muted:#9CA3AF;--card-bg:rgba(31,41,55,.5);--border:rgba(245,176,65,.2);--radius:12px;--radius-lg:20px;--shadow:0 4px 24px rgba(0,0,0,.4);--transition:.25s ease}
+html{scroll-behavior:smooth}
+body{font-family:'Inter',sans-serif;background:var(--bg);color:var(--text);min-height:100vh;line-height:1.6;-webkit-font-smoothing:antialiased}
+a{color:var(--gold);text-decoration:none;transition:opacity var(--transition)}
+a:hover{opacity:.8}
+img{max-width:100%;display:block}
+::-webkit-scrollbar{width:6px}
+::-webkit-scrollbar-track{background:var(--bg2)}
+::-webkit-scrollbar-thumb{background:var(--gold-dim);border-radius:3px}
+h1,h2,h3,h4,h5{font-weight:700;line-height:1.2}
+.gradient-text{background:linear-gradient(135deg,var(--gold) 0%,#FDE68A 50%,var(--gold) 100%);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text}
+.btn{display:inline-flex;align-items:center;gap:8px;padding:12px 24px;border-radius:var(--radius);font-family:'Inter',sans-serif;font-size:.95rem;font-weight:600;cursor:pointer;border:none;transition:all var(--transition);white-space:nowrap}
+.btn-primary{background:linear-gradient(135deg,var(--gold),var(--gold-dim));color:#0B1120;box-shadow:0 0 20px rgba(245,176,65,.3)}
+.btn-primary:hover{transform:translateY(-2px);box-shadow:0 0 32px rgba(245,176,65,.5)}
+.btn-outline{background:transparent;border:1px solid var(--border);color:var(--text)}
+.btn-outline:hover{border-color:var(--gold);color:var(--gold);background:var(--gold-glow);opacity:1}
+.btn-ghost{background:transparent;color:var(--text-muted)}
+.btn-ghost:hover{color:var(--gold);opacity:1}
+.btn-danger{background:rgba(239,68,68,.15);color:#F87171;border:1px solid rgba(239,68,68,.3)}
+.btn-danger:hover{background:rgba(239,68,68,.25);opacity:1}
+.btn-sm{padding:8px 16px;font-size:.85rem}
+.btn-lg{padding:16px 32px;font-size:1.05rem}
+.btn:disabled{opacity:.5;cursor:not-allowed;transform:none!important}
+.card{background:var(--card-bg);backdrop-filter:blur(12px);border:1px solid var(--border);border-radius:var(--radius-lg);padding:24px}
+.card-glow{box-shadow:0 0 40px var(--gold-glow)}
+.navbar{position:fixed;top:0;left:0;right:0;z-index:100;display:flex;align-items:center;justify-content:space-between;padding:0 5%;height:68px;background:rgba(11,17,32,.85);backdrop-filter:blur(16px);border-bottom:1px solid var(--border)}
+.navbar-brand{font-size:1.3rem;font-weight:800;background:linear-gradient(135deg,var(--gold),#FDE68A);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text}
+.navbar-links{display:flex;align-items:center;gap:8px}
+.nav-link{padding:8px 14px;border-radius:8px;color:var(--text-muted);font-size:.9rem;font-weight:500;transition:all var(--transition)}
+.nav-link:hover,.nav-link.active{color:var(--gold);background:var(--gold-glow);opacity:1}
+.app-layout{display:flex;min-height:100vh;padding-top:68px}
+.sidebar{width:240px;flex-shrink:0;background:var(--bg2);border-right:1px solid var(--border);padding:24px 16px;position:fixed;top:68px;bottom:0;left:0;overflow-y:auto;display:flex;flex-direction:column;gap:4px}
+.sidebar-label{font-size:.7rem;font-weight:700;letter-spacing:.1em;color:var(--text-muted);text-transform:uppercase;padding:16px 12px 6px}
+.sidebar-link{display:flex;align-items:center;gap:12px;padding:10px 12px;border-radius:10px;color:var(--text-muted);font-size:.9rem;font-weight:500;transition:all var(--transition)}
+.sidebar-link:hover,.sidebar-link.active{background:var(--gold-glow);color:var(--gold);opacity:1}
+.sidebar-link svg{width:18px;height:18px;flex-shrink:0}
+.main-content{margin-left:240px;flex:1;padding:32px}
+.form-group{display:flex;flex-direction:column;gap:6px}
+.form-label{font-size:.85rem;font-weight:600;color:var(--text-muted)}
+.form-control{background:rgba(255,255,255,.04);border:1px solid var(--border);border-radius:var(--radius);color:var(--text);font-family:'Inter',sans-serif;font-size:.95rem;padding:12px 16px;transition:border-color var(--transition),box-shadow var(--transition);width:100%}
+.form-control:focus{outline:none;border-color:var(--gold);box-shadow:0 0 0 3px rgba(245,176,65,.1)}
+.form-control::placeholder{color:var(--text-muted)}
+textarea.form-control{resize:vertical;min-height:120px}
+select.form-control{cursor:pointer}
+select.form-control option{background:var(--bg3)}
+.badge{display:inline-flex;align-items:center;gap:4px;padding:3px 10px;border-radius:999px;font-size:.75rem;font-weight:600}
+.badge-gold{background:rgba(245,176,65,.15);color:var(--gold);border:1px solid rgba(245,176,65,.3)}
+.badge-green{background:rgba(16,185,129,.15);color:#34D399;border:1px solid rgba(16,185,129,.3)}
+.badge-red{background:rgba(239,68,68,.15);color:#F87171;border:1px solid rgba(239,68,68,.3)}
+.badge-gray{background:rgba(107,114,128,.15);color:#9CA3AF;border:1px solid rgba(107,114,128,.3)}
+.table-wrap{overflow-x:auto}
+table{width:100%;border-collapse:collapse;font-size:.9rem}
+thead tr{border-bottom:1px solid var(--border)}
+th{padding:12px 16px;text-align:left;color:var(--text-muted);font-weight:600;font-size:.8rem;text-transform:uppercase;letter-spacing:.05em}
+td{padding:14px 16px;border-bottom:1px solid rgba(255,255,255,.04)}
+tbody tr:hover{background:rgba(255,255,255,.02)}
+.modal-overlay{position:fixed;inset:0;z-index:200;background:rgba(0,0,0,.7);backdrop-filter:blur(4px);display:flex;align-items:center;justify-content:center;padding:20px;opacity:0;pointer-events:none;transition:opacity var(--transition)}
+.modal-overlay.open{opacity:1;pointer-events:all}
+.modal{background:var(--bg2);border:1px solid var(--border);border-radius:var(--radius-lg);padding:32px;width:100%;max-width:520px;transform:translateY(20px);transition:transform var(--transition)}
+.modal-overlay.open .modal{transform:translateY(0)}
+.modal-header{display:flex;justify-content:space-between;align-items:center;margin-bottom:24px}
+.modal-close{background:none;border:none;color:var(--text-muted);cursor:pointer;font-size:1.4rem;line-height:1}
+#toast-container{position:fixed;bottom:24px;right:24px;z-index:999;display:flex;flex-direction:column;gap:10px}
+.toast{display:flex;align-items:center;gap:12px;padding:14px 18px;border-radius:12px;font-size:.9rem;font-weight:500;backdrop-filter:blur(12px);animation:slideIn .3s ease;max-width:340px}
+.toast-success{background:rgba(16,185,129,.15);border:1px solid rgba(16,185,129,.3);color:#34D399}
+.toast-error{background:rgba(239,68,68,.15);border:1px solid rgba(239,68,68,.3);color:#F87171}
+.toast-info{background:rgba(245,176,65,.15);border:1px solid rgba(245,176,65,.3);color:var(--gold)}
+@keyframes slideIn{from{transform:translateX(120%);opacity:0}to{transform:translateX(0);opacity:1}}
+.spinner{width:20px;height:20px;border-radius:50%;border:2px solid rgba(245,176,65,.3);border-top-color:var(--gold);animation:spin .7s linear infinite}
+@keyframes spin{to{transform:rotate(360deg)}}
+.loading-full{display:flex;align-items:center;justify-content:center;min-height:60vh;flex-direction:column;gap:16px;color:var(--text-muted)}
+.page-header{margin-bottom:32px}
+.page-header h1{font-size:1.6rem;margin-bottom:6px}
+.page-header p{color:var(--text-muted)}
+.stats-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:16px;margin-bottom:32px}
+.stat-card{padding:20px}
+.stat-card .stat-label{font-size:.8rem;color:var(--text-muted);font-weight:600;text-transform:uppercase;letter-spacing:.05em;margin-bottom:8px}
+.stat-card .stat-value{font-size:2rem;font-weight:800}
+.stat-card .stat-sub{font-size:.8rem;color:var(--text-muted);margin-top:4px}
+.flex{display:flex}.flex-col{flex-direction:column}.items-center{align-items:center}.justify-between{justify-content:space-between}
+.gap-8{gap:8px}.gap-16{gap:16px}.gap-24{gap:24px}
+.mt-8{margin-top:8px}.mt-16{margin-top:16px}.mt-24{margin-top:24px}.mb-16{margin-bottom:16px}.mb-24{margin-bottom:24px}
+.text-muted{color:var(--text-muted)}.text-gold{color:var(--gold)}.text-sm{font-size:.85rem}.text-center{text-align:center}.w-full{width:100%}.hidden{display:none!important}
+@media(max-width:768px){.sidebar{transform:translateX(-100%);z-index:90;transition:transform var(--transition)}.sidebar.open{transform:translateX(0)}.main-content{margin-left:0;padding:16px}.navbar{padding:0 16px}.stats-grid{grid-template-columns:1fr 1fr}}`;}
+
+function getJS(){return `/* AUDITCV — main.js */
+const SUPABASE_URL = 'https://SEU_PROJECT.supabase.co';
+const SUPABASE_ANON_KEY = 'SUA_ANON_KEY';
+const CLAUDE_KEY = 'SUA_ANTHROPIC_KEY';
+
+const { createClient } = supabase;
+const sb = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+function toast(msg, type='info', duration=4000){
+  let c = document.getElementById('toast-container');
+  if(!c){c=document.createElement('div');c.id='toast-container';document.body.appendChild(c);}
+  const t = document.createElement('div');
+  t.className = \`toast toast-\${type}\`;
+  const icons={success:'✅',error:'❌',info:'💡'};
+  t.innerHTML = \`<span>\${icons[type]||'💡'}</span><span>\${msg}</span>\`;
+  c.appendChild(t);
+  setTimeout(()=>t.remove(), duration);
+}
+
+async function getSession(){ const {data}=await sb.auth.getSession(); return data.session; }
+async function getUser(){ const {data}=await sb.auth.getUser(); return data.user; }
+async function requireAuth(redirect='login.html'){
+  const s=await getSession();
+  if(!s){window.location.href=redirect;return null;}
+  return s.user;
+}
+async function requireAdmin(){
+  const u=await requireAuth(); if(!u) return null;
+  const {data}=await sb.from('admins').select('email').eq('email',u.email).single();
+  if(!data){window.location.href='dashboard.html';return null;}
+  return u;
+}
+async function signOut(){ await sb.auth.signOut(); window.location.href='index.html'; }
+
+async function upsertUsuario(user){
+  await sb.from('usuarios').upsert({id:user.id,email:user.email,nome:user.user_metadata?.full_name||'',avatar_url:user.user_metadata?.avatar_url||''},{onConflict:'id'});
+  await sb.from('debitos').upsert({usuario_id:user.id,total_geracoes:0,valor_devido:0,status:'adimplente'},{onConflict:'usuario_id',ignoreDuplicates:true});
+}
+
+function fmtDate(iso){ if(!iso) return '—'; return new Date(iso).toLocaleString('pt-BR',{dateStyle:'short',timeStyle:'short'}); }
+function fmtBRL(val){ return Number(val||0).toLocaleString('pt-BR',{style:'currency',currency:'BRL'}); }
+
+function setLoading(btn,loading,text=''){
+  if(!btn) return;
+  btn.disabled=loading;
+  if(loading){btn._orig=btn.innerHTML;btn.innerHTML=\`<span class="spinner"></span> \${text||'Aguarde...'}\`;}
+  else{btn.innerHTML=btn._orig||text;btn._orig=null;}
+}
+
+function openModal(id){ document.getElementById(id)?.classList.add('open'); }
+function closeModal(id){ document.getElementById(id)?.classList.remove('open'); }
+
+function initMobileSidebar(){
+  const btn=document.getElementById('sidebar-toggle');
+  const sidebar=document.querySelector('.sidebar');
+  btn?.addEventListener('click',()=>sidebar?.classList.toggle('open'));
+}
+document.addEventListener('DOMContentLoaded',initMobileSidebar);`;}
+
+function getIndex(){return `<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8"/><meta name="viewport" content="width=device-width,initial-scale=1.0"/>
+<title>AUDITCV — Currículo com IA que passa em tudo</title>
+<link rel="stylesheet" href="assets/css/style.css"/>
+<style>
+.hero{min-height:100vh;display:flex;align-items:center;justify-content:center;text-align:center;padding:120px 20px 80px;position:relative;overflow:hidden}
+.hero::before{content:'';position:absolute;top:-200px;left:50%;transform:translateX(-50%);width:800px;height:800px;border-radius:50%;background:radial-gradient(circle,rgba(245,176,65,.08) 0%,transparent 70%);pointer-events:none}
+.hero-badge{display:inline-flex;align-items:center;gap:8px;background:rgba(245,176,65,.1);border:1px solid rgba(245,176,65,.3);border-radius:999px;padding:6px 16px;font-size:.8rem;font-weight:600;color:var(--gold);margin-bottom:24px}
+.hero h1{font-size:clamp(2.2rem,6vw,4rem);margin-bottom:20px;line-height:1.15}
+.hero p{font-size:1.15rem;color:var(--text-muted);max-width:560px;margin:0 auto 36px}
+.hero-cta{display:flex;gap:12px;justify-content:center;flex-wrap:wrap}
+.features{padding:100px 5%}
+.features-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:24px;margin-top:48px}
+.feature-card{padding:32px 28px;background:var(--card-bg);backdrop-filter:blur(12px);border:1px solid var(--border);border-radius:var(--radius-lg);transition:all .3s}
+.feature-card:hover{border-color:rgba(245,176,65,.5);transform:translateY(-4px);box-shadow:0 12px 40px rgba(245,176,65,.1)}
+.feature-icon{width:52px;height:52px;border-radius:14px;background:linear-gradient(135deg,rgba(245,176,65,.2),rgba(245,176,65,.05));border:1px solid rgba(245,176,65,.3);display:flex;align-items:center;justify-content:center;font-size:1.5rem;margin-bottom:20px}
+.feature-card h3{font-size:1.1rem;margin-bottom:10px}
+.feature-card p{color:var(--text-muted);font-size:.9rem;line-height:1.7}
+.models{padding:80px 5%;background:var(--bg2)}
+.models-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:20px;margin-top:48px}
+.model-card{padding:28px;border-radius:var(--radius-lg);border:1px solid var(--border);background:var(--card-bg);position:relative;transition:all .3s}
+.model-card.featured{border-color:var(--gold);box-shadow:0 0 40px rgba(245,176,65,.15)}
+.model-card.featured::before{content:'⭐ Mais popular';position:absolute;top:-12px;left:50%;transform:translateX(-50%);background:var(--gold);color:#0B1120;font-size:.7rem;font-weight:800;padding:3px 12px;border-radius:999px;white-space:nowrap}
+.model-price{font-size:2rem;font-weight:800;color:var(--gold);margin:12px 0}
+.model-price span{font-size:1rem;font-weight:400;color:var(--text-muted)}
+.model-features{list-style:none;display:flex;flex-direction:column;gap:8px;margin:16px 0 24px}
+.model-features li{display:flex;align-items:center;gap:8px;font-size:.9rem;color:var(--text-muted)}
+.model-features li::before{content:'✓';color:var(--gold);font-weight:700}
+.cta-banner{padding:80px 5%;text-align:center;background:linear-gradient(135deg,rgba(245,176,65,.05),rgba(245,176,65,.02))}
+.cta-banner h2{font-size:clamp(1.6rem,4vw,2.5rem);margin-bottom:16px}
+footer{padding:32px 5%;border-top:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:12px;color:var(--text-muted);font-size:.85rem}
+</style>
+</head>
+<body>
+<nav class="navbar">
+  <a href="index.html" class="navbar-brand">✦ AUDITCV</a>
+  <div class="navbar-links">
+    <a href="#features" class="nav-link">Funcionalidades</a>
+    <a href="#modelos" class="nav-link">Preços</a>
+    <a href="login.html" class="btn btn-outline btn-sm">Entrar</a>
+    <a href="login.html" class="btn btn-primary btn-sm">Começar grátis</a>
+  </div>
+</nav>
+<section class="hero">
+  <div>
+    <div class="hero-badge">✦ Powered by Claude IA</div>
+    <h1>O currículo que<br><span class="gradient-text">passa nos filtros ATS</span><br>e encanta recrutadores</h1>
+    <p>Cole seu currículo, informe o cargo desejado e nossa IA reescreve tudo em segundos. Aprovado por +2.000 profissionais.</p>
+    <div class="hero-cta">
+      <a href="login.html" class="btn btn-primary btn-lg">✦ Gerar meu currículo agora</a>
+      <a href="#modelos" class="btn btn-outline btn-lg">Ver planos</a>
+    </div>
+  </div>
+</section>
+<section class="features" id="features">
+  <div style="text-align:center"><h2 style="font-size:clamp(1.6rem,4vw,2.2rem)">Por que o <span class="gradient-text">AUDITCV</span>?</h2></div>
+  <div class="features-grid">
+    <div class="feature-card"><div class="feature-icon">🤖</div><h3>IA Generativa Avançada</h3><p>Usamos Claude para reescrever seu currículo com linguagem profissional e impacto real.</p></div>
+    <div class="feature-card"><div class="feature-icon">🎯</div><h3>Otimizado para ATS</h3><p>Formatação e palavras-chave ajustadas automaticamente para passar nos sistemas de triagem.</p></div>
+    <div class="feature-card"><div class="feature-icon">⚡</div><h3>Resultado em 30 segundos</h3><p>Faça login com Google e gere seu currículo profissional em menos de um minuto.</p></div>
+    <div class="feature-card"><div class="feature-icon">💳</div><h3>Pague só pelo que usar</h3><p>Sem assinatura mensal. Você gera, nós cobramos apenas o que foi utilizado.</p></div>
+  </div>
+</section>
+<section class="models" id="modelos">
+  <div style="text-align:center"><h2 style="font-size:clamp(1.6rem,4vw,2.2rem)">Escolha seu <span class="gradient-text">modelo</span></h2></div>
+  <div class="models-grid">
+    <div class="model-card"><h3>✦ Simples</h3><div class="model-price">R\$9<span>/geração</span></div><ul class="model-features"><li>Revisão profissional</li><li>Estrutura padrão</li><li>Linguagem adequada</li></ul><a href="login.html" class="btn btn-outline w-full">Escolher</a></div>
+    <div class="model-card featured"><h3>✦ ATS Pro</h3><div class="model-price">R\$19<span>/geração</span></div><ul class="model-features"><li>Tudo do Simples</li><li>Palavras-chave ATS</li><li>Score de compatibilidade</li></ul><a href="login.html" class="btn btn-primary w-full">Escolher</a></div>
+    <div class="model-card"><h3>✦ IA Mágica</h3><div class="model-price">R\$39<span>/geração</span></div><ul class="model-features"><li>Tudo do ATS Pro</li><li>Carta de apresentação</li><li>Sugestão LinkedIn</li></ul><a href="login.html" class="btn btn-outline w-full">Escolher</a></div>
+  </div>
+</section>
+<section class="cta-banner">
+  <h2>Pronto para <span class="gradient-text">conseguir a entrevista</span>?</h2>
+  <p class="text-muted">Mais de 2.000 profissionais já geraram currículos com o AUDITCV.</p>
+  <a href="login.html" class="btn btn-primary btn-lg">✦ Começar agora</a>
+</section>
+<footer>
+  <span>✦ AUDITCV &copy; 2025</span>
+  <div style="display:flex;gap:20px"><a href="#" class="text-muted">Termos</a><a href="#" class="text-muted">Privacidade</a></div>
+</footer>
+</body></html>`;}
+
+function getLogin(){return `<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8"/><meta name="viewport" content="width=device-width,initial-scale=1.0"/>
+<title>AUDITCV — Entrar</title>
+<link rel="stylesheet" href="assets/css/style.css"/>
+<style>
+body{display:flex;align-items:center;justify-content:center;min-height:100vh;padding:20px}
+.login-wrap{width:100%;max-width:420px;text-align:center}
+.login-logo{font-size:2rem;font-weight:800;margin-bottom:8px}
+.google-btn{display:flex;align-items:center;justify-content:center;gap:12px;width:100%;padding:14px;border-radius:12px;background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.12);color:var(--text);font-size:1rem;font-weight:600;cursor:pointer;transition:all .25s}
+.google-btn:hover{background:rgba(255,255,255,.1)}
+.divider{display:flex;align-items:center;gap:12px;margin:24px 0;color:var(--text-muted);font-size:.8rem}
+.divider::before,.divider::after{content:'';flex:1;height:1px;background:var(--border)}
+.login-card{padding:40px}
+.login-terms{font-size:.78rem;color:var(--text-muted);margin-top:20px;line-height:1.6}
+</style>
+</head>
+<body>
+<div class="login-wrap">
+  <div class="login-logo gradient-text">✦ AUDITCV</div>
+  <p class="text-muted" style="margin-bottom:40px">Gere currículos profissionais com IA em segundos</p>
+  <div class="card login-card">
+    <h2 style="font-size:1.4rem;margin-bottom:6px">Bem-vindo de volta</h2>
+    <p class="text-muted text-sm mb-24">Entre com sua conta Google para continuar</p>
+    <button class="google-btn" onclick="loginGoogle()">
+      <svg width="20" height="20" viewBox="0 0 24 24"><path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/><path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/><path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"/><path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/></svg>
+      Continuar com Google
+    </button>
+    <div class="divider">ou</div>
+    <div class="form-group mb-16"><label class="form-label">E-mail</label><input type="email" id="email-input" class="form-control" placeholder="seu@email.com"/></div>
+    <button class="btn btn-outline w-full" onclick="loginMagicLink()">Receber link de acesso por e-mail</button>
+    <p class="login-terms">Ao entrar, você concorda com os <a href="#">Termos de Uso</a> e a <a href="#">Política de Privacidade</a>.</p>
+  </div>
+</div>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="assets/js/main.js"></script>
+<script>
+(async()=>{ const s=await getSession(); if(s) window.location.href='dashboard.html'; })();
+async function loginGoogle(){
+  const {error}=await sb.auth.signInWithOAuth({provider:'google',options:{redirectTo:window.location.origin+'/dashboard.html'}});
+  if(error) toast('Erro: '+error.message,'error');
+}
+async function loginMagicLink(){
+  const email=document.getElementById('email-input').value.trim();
+  if(!email){toast('Informe seu e-mail','error');return;}
+  const {error}=await sb.auth.signInWithOtp({email,options:{emailRedirectTo:window.location.origin+'/dashboard.html'}});
+  if(error) toast('Erro: '+error.message,'error');
+  else toast('✉️ Link enviado! Verifique seu e-mail.','success',6000);
+}
+</script>
+</body></html>`;}
+
+function getDash(){return `<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8"/><meta name="viewport" content="width=device-width,initial-scale=1.0"/>
+<title>AUDITCV — Dashboard</title>
+<link rel="stylesheet" href="assets/css/style.css"/>
+<style>
+.welcome-bar{display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:16px;margin-bottom:32px}
+.avatar{width:40px;height:40px;border-radius:50%;border:2px solid var(--gold);object-fit:cover}
+.debito-alert{background:rgba(239,68,68,.1);border:1px solid rgba(239,68,68,.3);border-radius:12px;padding:16px 20px;display:flex;align-items:center;gap:12px;margin-bottom:24px;color:#F87171}
+.model-badge{display:inline-block;padding:2px 10px;border-radius:999px;font-size:.75rem;font-weight:600}
+.model-simple{background:rgba(107,114,128,.15);color:#9CA3AF}
+.model-ats{background:rgba(59,130,246,.15);color:#93C5FD}
+.model-ia{background:rgba(245,176,65,.15);color:var(--gold)}
+</style>
+</head>
+<body>
+<nav class="navbar">
+  <a href="index.html" class="navbar-brand">✦ AUDITCV</a>
+  <div class="navbar-links" id="nav-user"></div>
+</nav>
+<div class="app-layout">
+  <aside class="sidebar">
+    <a href="dashboard.html" class="sidebar-link active"><svg fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>Dashboard</a>
+    <a href="gerador.html" class="sidebar-link"><svg fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M12 4v16m-8-8h16"/></svg>Gerar Currículo</a>
+    <a href="perfil.html" class="sidebar-link"><svg fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><circle cx="12" cy="8" r="4"/><path d="M4 20c0-4 3.6-7 8-7s8 3 8 7"/></svg>Meu Perfil</a>
+    <div style="flex:1"></div>
+    <button class="btn btn-ghost btn-sm" style="justify-content:flex-start;gap:8px;color:var(--text-muted)" onclick="signOut()">Sair</button>
+  </aside>
+  <main class="main-content">
+    <div class="welcome-bar">
+      <div class="flex items-center gap-16"><img id="user-avatar" class="avatar" src="" alt=""/><div><h1 style="font-size:1.4rem" id="user-name">...</h1><p class="text-muted text-sm" id="user-email"></p></div></div>
+      <a href="gerador.html" class="btn btn-primary">✦ Novo currículo</a>
+    </div>
+    <div id="debito-alert" class="debito-alert hidden">⚠️ <span id="debito-msg"></span><a href="perfil.html" style="margin-left:auto;color:#F87171;font-weight:600;font-size:.9rem">Ver →</a></div>
+    <div class="stats-grid">
+      <div class="card stat-card"><div class="stat-label">Total gerado</div><div class="stat-value text-gold" id="stat-total">0</div><div class="stat-sub">currículos</div></div>
+      <div class="card stat-card"><div class="stat-label">Valor devido</div><div class="stat-value" id="stat-valor">R$0</div></div>
+      <div class="card stat-card"><div class="stat-label">Status</div><div class="stat-value" id="stat-status" style="font-size:1.1rem;padding-top:6px">—</div></div>
+      <div class="card stat-card"><div class="stat-label">Membro desde</div><div class="stat-value" id="stat-membro" style="font-size:1rem;padding-top:6px">—</div></div>
+    </div>
+    <div class="card">
+      <div class="flex justify-between items-center mb-24"><h2 style="font-size:1.1rem">Histórico de gerações</h2><a href="gerador.html" class="btn btn-outline btn-sm">+ Novo</a></div>
+      <div id="loading-hist" class="loading-full" style="min-height:200px"><div class="spinner"></div><span>Carregando...</span></div>
+      <div id="empty-hist" class="hidden" style="text-align:center;padding:60px 0;color:var(--text-muted)"><div style="font-size:3rem">📄</div><p>Nenhum currículo gerado ainda.</p><a href="gerador.html" class="btn btn-primary mt-16">✦ Gerar agora</a></div>
+      <div class="table-wrap hidden" id="tabela-wrap"><table><thead><tr><th>#</th><th>Cargo</th><th>Modelo</th><th>Data</th><th>Status</th><th></th></tr></thead><tbody id="tbody-geracoes"></tbody></table></div>
+    </div>
+  </main>
+</div>
+<div class="modal-overlay" id="modal-cv"><div class="modal" style="max-width:700px"><div class="modal-header"><h3>Currículo gerado</h3><button class="modal-close" onclick="closeModal('modal-cv')">×</button></div><div id="modal-cv-content" style="white-space:pre-wrap;font-size:.9rem;color:var(--text-muted);max-height:60vh;overflow-y:auto;line-height:1.8"></div><div class="flex gap-8 mt-24"><button class="btn btn-primary" onclick="navigator.clipboard.writeText(document.getElementById('modal-cv-content').textContent).then(()=>toast('Copiado!','success'))">📋 Copiar</button><button class="btn btn-outline" onclick="closeModal('modal-cv')">Fechar</button></div></div></div>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="assets/js/main.js"></script>
+<script>
+const mL={simple:'Simples',ats:'ATS Pro',ia_magica:'IA Mágica'};
+const mC={simple:'model-simple',ats:'model-ats',ia_magica:'model-ia'};
+(async()=>{
+  const user=await requireAuth(); if(!user) return;
+  document.getElementById('user-avatar').src=user.user_metadata?.avatar_url||'https://ui-avatars.com/api/?name=U&background=F5B041&color=0B1120';
+  document.getElementById('user-name').textContent=user.user_metadata?.full_name||'Usuário';
+  document.getElementById('user-email').textContent=user.email;
+  document.getElementById('stat-membro').textContent=fmtDate(user.created_at).split(',')[0];
+  const {data:deb}=await sb.from('debitos').select('*').eq('usuario_id',user.id).single();
+  if(deb){
+    document.getElementById('stat-total').textContent=deb.total_geracoes;
+    document.getElementById('stat-valor').textContent=fmtBRL(deb.valor_devido);
+    const sc={adimplente:'badge-green',pendente:'badge-gold',bloqueado:'badge-red'};
+    const sl={adimplente:'✅ Adimplente',pendente:'⚠️ Pendente',bloqueado:'🚫 Bloqueado'};
+    document.getElementById('stat-status').innerHTML=\`<span class="badge \${sc[deb.status]||'badge-gray'}">\${sl[deb.status]||deb.status}</span>\`;
+    if(deb.status!=='adimplente'){document.getElementById('debito-alert').classList.remove('hidden');document.getElementById('debito-msg').textContent=\`Débito de \${fmtBRL(deb.valor_devido)} pendente.\`;}
+  }
+  const {data:g}=await sb.from('geracoes').select('*').eq('usuario_id',user.id).order('data_geracao',{ascending:false});
+  document.getElementById('loading-hist').classList.add('hidden');
+  if(!g||!g.length){document.getElementById('empty-hist').classList.remove('hidden');}
+  else{
+    document.getElementById('tabela-wrap').classList.remove('hidden');
+    const tb=document.getElementById('tbody-geracoes');
+    g.forEach(r=>{tb.innerHTML+=\`<tr><td class="text-muted">#\${r.id}</td><td><strong>\${r.cargo_alvo||'—'}</strong></td><td><span class="model-badge \${mC[r.modelo]}">\${mL[r.modelo]}</span></td><td class="text-muted">\${fmtDate(r.data_geracao)}</td><td><span class="badge \${r.status_pagamento==='pago'?'badge-green':'badge-gold'}">\${r.status_pagamento==='pago'?'Pago':'Pendente'}</span></td><td><button class="btn btn-ghost btn-sm" onclick="document.getElementById('modal-cv-content').textContent=\${JSON.stringify(r.conteudo_gerado||'').replace(/'/g,\\"\\\\\\'\\")}||'—';openModal('modal-cv')">Ver →</button></td></tr>\`;});
+  }
+})();
+</script>
+</body></html>`;}
+
+function getGerador(){return `<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8"/><meta name="viewport" content="width=device-width,initial-scale=1.0"/>
+<title>AUDITCV — Gerar Currículo</title>
+<link rel="stylesheet" href="assets/css/style.css"/>
+<style>
+.step-indicator{display:flex;align-items:center;gap:0;margin-bottom:40px}
+.step{display:flex;align-items:center;gap:10px;font-size:.85rem;font-weight:600;color:var(--text-muted)}
+.step.active{color:var(--gold)}.step.done{color:#34D399}
+.step-num{width:28px;height:28px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:.8rem;font-weight:700;background:var(--bg3);border:2px solid var(--border)}
+.step.active .step-num{background:var(--gold);border-color:var(--gold);color:#0B1120}
+.step.done .step-num{background:#34D399;border-color:#34D399;color:#0B1120}
+.step-line{flex:1;height:2px;background:var(--border);margin:0 8px;min-width:32px}
+.step-line.done{background:#34D399}
+.modelo-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:16px}
+.modelo-option{border:2px solid var(--border);border-radius:var(--radius-lg);padding:20px;cursor:pointer;transition:all .25s;text-align:center}
+.modelo-option:hover,.modelo-option.selected{border-color:var(--gold);background:var(--gold-glow)}
+.modelo-option .icon{font-size:2rem;margin-bottom:10px}
+.modelo-option .price{color:var(--gold);font-weight:700;font-size:.95rem}
+.output-box{background:rgba(0,0,0,.3);border:1px solid var(--border);border-radius:var(--radius);padding:24px;white-space:pre-wrap;font-size:.9rem;line-height:1.9;min-height:300px;color:var(--text)}
+.gen-anim{display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:300px;gap:16px}
+.gen-spinner{width:56px;height:56px;border-radius:50%;border:4px solid rgba(245,176,65,.2);border-top-color:var(--gold);animation:spin .8s linear infinite}
+</style>
+</head>
+<body>
+<nav class="navbar"><a href="index.html" class="navbar-brand">✦ AUDITCV</a><div class="navbar-links"><a href="dashboard.html" class="nav-link">← Dashboard</a></div></nav>
+<div class="app-layout">
+<aside class="sidebar">
+  <a href="dashboard.html" class="sidebar-link"><svg fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>Dashboard</a>
+  <a href="gerador.html" class="sidebar-link active"><svg fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M12 4v16m-8-8h16"/></svg>Gerar Currículo</a>
+  <a href="perfil.html" class="sidebar-link"><svg fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><circle cx="12" cy="8" r="4"/><path d="M4 20c0-4 3.6-7 8-7s8 3 8 7"/></svg>Meu Perfil</a>
+  <div style="flex:1"></div>
+  <button class="btn btn-ghost btn-sm" style="justify-content:flex-start;gap:8px;color:var(--text-muted)" onclick="signOut()">Sair</button>
+</aside>
+<main class="main-content">
+  <div class="page-header"><h1>✦ Gerar Currículo</h1><p class="text-muted">Cole seu currículo, escolha o modelo e deixe a IA trabalhar</p></div>
+  <div class="step-indicator">
+    <div class="step active" id="step-1"><div class="step-num">1</div>Modelo</div>
+    <div class="step-line" id="line-1"></div>
+    <div class="step" id="step-2"><div class="step-num">2</div>Dados</div>
+    <div class="step-line" id="line-2"></div>
+    <div class="step" id="step-3"><div class="step-num">3</div>Resultado</div>
+  </div>
+  <div id="passo-1">
+    <h3 class="mb-16">Escolha o modelo</h3>
+    <div class="modelo-grid">
+      <div class="modelo-option selected" data-modelo="simple" onclick="selecionarModelo(this)"><div class="icon">📄</div><h4>Simples</h4><div class="price">R$9/geração</div><p style="font-size:.8rem;color:var(--text-muted);margin-top:6px">Revisão profissional</p></div>
+      <div class="modelo-option" data-modelo="ats" onclick="selecionarModelo(this)"><div class="icon">🎯</div><h4>ATS Pro</h4><div class="price">R$19/geração</div><p style="font-size:.8rem;color:var(--text-muted);margin-top:6px">Otimizado para triagem</p></div>
+      <div class="modelo-option" data-modelo="ia_magica" onclick="selecionarModelo(this)"><div class="icon">✨</div><h4>IA Mágica</h4><div class="price">R$39/geração</div><p style="font-size:.8rem;color:var(--text-muted);margin-top:6px">Reescrita completa + carta</p></div>
+    </div>
+    <div class="flex justify-between mt-24"><div></div><button class="btn btn-primary" onclick="irPasso(2)">Próximo →</button></div>
+  </div>
+  <div id="passo-2" class="hidden">
+    <div style="display:grid;gap:20px">
+      <div class="form-group"><label class="form-label">Cargo alvo *</label><input type="text" id="cargo-alvo" class="form-control" placeholder="Ex: Gerente de Vendas..."/></div>
+      <div class="form-group"><label class="form-label">Currículo atual *</label><textarea id="curriculo-original" class="form-control" rows="12" placeholder="Cole seu currículo aqui..."></textarea></div>
+      <div class="form-group"><label class="form-label">Observações (opcional)</label><textarea id="obs-extras" class="form-control" rows="3" placeholder="Ex: foco em liderança, startup de tecnologia..."></textarea></div>
+    </div>
+    <div class="flex justify-between mt-24"><button class="btn btn-outline" onclick="irPasso(1)">← Voltar</button><button class="btn btn-primary" id="btn-gerar" onclick="gerarCurriculo()">✦ Gerar com IA</button></div>
+  </div>
+  <div id="passo-3" class="hidden">
+    <div id="resultado-loading" class="card gen-anim"><div class="gen-spinner"></div><p class="text-gold" style="font-weight:600">A IA está reescrevendo seu currículo...</p><p class="text-muted text-sm">Até 30 segundos</p></div>
+    <div id="resultado-content" class="hidden">
+      <div class="flex justify-between items-center mb-16"><h3>✅ Currículo gerado!</h3><div class="flex gap-8"><button class="btn btn-outline btn-sm" onclick="navigator.clipboard.writeText(document.getElementById('output-text').textContent).then(()=>toast('Copiado!','success'))">📋 Copiar</button><button class="btn btn-primary btn-sm" onclick="novaGeracao()">+ Nova geração</button></div></div>
+      <div class="output-box" id="output-text"></div>
+      <div class="card mt-24" style="background:rgba(245,176,65,.05);border-color:rgba(245,176,65,.3)"><div class="flex justify-between items-center flex-wrap gap-16"><div><p style="font-weight:600">Geração registrada no histórico.</p><p class="text-muted text-sm mt-8">Acesse <a href="perfil.html">Meu Perfil</a> para ver seu saldo.</p></div><a href="dashboard.html" class="btn btn-outline btn-sm">Ver histórico →</a></div></div>
+    </div>
+  </div>
+</main>
+</div>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="assets/js/main.js"></script>
+<script>
+let modeloSelecionado='simple',currentUser=null;
+const precos={simple:9,ats:19,ia_magica:39};
+(async()=>{ currentUser=await requireAuth(); if(!currentUser) return; const {data:deb}=await sb.from('debitos').select('status').eq('usuario_id',currentUser.id).single(); if(deb?.status==='bloqueado'){toast('Conta bloqueada por débitos.','error',8000);document.getElementById('btn-gerar').disabled=true;} })();
+function selecionarModelo(el){document.querySelectorAll('.modelo-option').forEach(e=>e.classList.remove('selected'));el.classList.add('selected');modeloSelecionado=el.dataset.modelo;}
+function irPasso(num){[1,2,3].forEach(n=>{document.getElementById('passo-'+n).classList.toggle('hidden',n!==num);const s=document.getElementById('step-'+n);s.classList.remove('active','done');if(n<num)s.classList.add('done');if(n===num)s.classList.add('active');});[1,2].forEach(n=>{document.getElementById('line-'+n)?.classList.toggle('done',n<num);});}
+async function gerarCurriculo(){
+  const cargo=document.getElementById('cargo-alvo').value.trim();
+  const orig=document.getElementById('curriculo-original').value.trim();
+  const obs=document.getElementById('obs-extras').value.trim();
+  if(!cargo){toast('Informe o cargo alvo','error');return;}
+  if(!orig){toast('Cole seu currículo','error');return;}
+  setLoading(document.getElementById('btn-gerar'),true,'Gerando...');
+  irPasso(3);
+  const prompts={
+    simple:\`Você é especialista em RH. Reescreva o currículo para o cargo de "\${cargo}". Retorne APENAS o currículo reescrito.\`,
+    ats:\`Você é especialista em ATS. Reescreva o currículo otimizado para "\${cargo}" com palavras-chave do setor. Adicione seção "💡 Dicas" com 3 sugestões.\`,
+    ia_magica:\`Você é ghostwriter executivo. Reescreva completamente para "\${cargo}" com narrativa poderosa. Inclua: 1) Currículo, 2) Carta de apresentação, 3) Sugestão LinkedIn.\`
+  };
+  try{
+    const resp=await fetch('https://api.anthropic.com/v1/messages',{method:'POST',headers:{'Content-Type':'application/json','x-api-key':CLAUDE_KEY,'anthropic-version':'2023-06-01'},body:JSON.stringify({model:'claude-haiku-4-5-20251001',max_tokens:2000,system:prompts[modeloSelecionado],messages:[{role:'user',content:\`CARGO: \${cargo}\\n\\nCURRÍCULO:\\n\${orig}\${obs?'\\n\\nOBSERVAÇÕES:\\n'+obs:''}\`}]})});
+    const data=await resp.json();
+    const conteudo=data.content?.[0]?.text||'Erro ao gerar.';
+    await sb.from('geracoes').insert({usuario_id:currentUser.id,modelo:modeloSelecionado,cargo_alvo:cargo,conteudo_original:orig,conteudo_gerado:conteudo,status_pagamento:'pendente'});
+    const preco=precos[modeloSelecionado];
+    const {data:deb}=await sb.from('debitos').select('*').eq('usuario_id',currentUser.id).single();
+    if(deb) await sb.from('debitos').update({total_geracoes:(deb.total_geracoes||0)+1,valor_devido:parseFloat(deb.valor_devido||0)+preco,status:'pendente',ultima_geracao:new Date().toISOString(),updated_at:new Date().toISOString()}).eq('usuario_id',currentUser.id);
+    document.getElementById('resultado-loading').classList.add('hidden');
+    document.getElementById('resultado-content').classList.remove('hidden');
+    document.getElementById('output-text').textContent=conteudo;
+    toast('✅ Currículo gerado!','success');
+  }catch(e){irPasso(2);setLoading(document.getElementById('btn-gerar'),false,'✦ Gerar com IA');toast('Erro: '+e.message,'error');}
+}
+function novaGeracao(){document.getElementById('curriculo-original').value='';document.getElementById('cargo-alvo').value='';document.getElementById('resultado-loading').classList.remove('hidden');document.getElementById('resultado-content').classList.add('hidden');irPasso(1);}
+</script>
+</body></html>`;}
+
+function getPerfil(){return `<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8"/><meta name="viewport" content="width=device-width,initial-scale=1.0"/>
+<title>AUDITCV — Meu Perfil</title>
+<link rel="stylesheet" href="assets/css/style.css"/>
+<style>
+.avatar-lg{width:80px;height:80px;border-radius:50%;border:3px solid var(--gold);object-fit:cover}
+.profile-header{display:flex;align-items:center;gap:20px;margin-bottom:32px;flex-wrap:wrap}
+.info-grid{display:grid;grid-template-columns:1fr 1fr;gap:20px}
+.debito-card{background:linear-gradient(135deg,rgba(245,176,65,.1),rgba(245,176,65,.03));border:1px solid rgba(245,176,65,.3);border-radius:16px;padding:24px}
+@media(max-width:600px){.info-grid{grid-template-columns:1fr}}
+</style>
+</head>
+<body>
+<nav class="navbar"><a href="index.html" class="navbar-brand">✦ AUDITCV</a><div class="navbar-links"><a href="dashboard.html" class="nav-link">← Dashboard</a></div></nav>
+<div class="app-layout">
+<aside class="sidebar">
+  <a href="dashboard.html" class="sidebar-link"><svg fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>Dashboard</a>
+  <a href="gerador.html" class="sidebar-link"><svg fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M12 4v16m-8-8h16"/></svg>Gerar Currículo</a>
+  <a href="perfil.html" class="sidebar-link active"><svg fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><circle cx="12" cy="8" r="4"/><path d="M4 20c0-4 3.6-7 8-7s8 3 8 7"/></svg>Meu Perfil</a>
+  <div style="flex:1"></div>
+  <button class="btn btn-ghost btn-sm" style="justify-content:flex-start;gap:8px;color:var(--text-muted)" onclick="signOut()">Sair</button>
+</aside>
+<main class="main-content">
+  <div class="page-header"><h1>Meu Perfil</h1><p class="text-muted">Gerencie seus dados e acompanhe seu saldo</p></div>
+  <div class="profile-header"><img id="avatar" class="avatar-lg" src="" alt=""/><div><h2 id="nome-display">...</h2><p class="text-muted text-sm" id="email-display"></p><span id="status-badge" class="badge mt-8">—</span></div></div>
+  <div class="debito-card mb-24"><div class="flex justify-between items-center flex-wrap gap-16"><div><p class="text-muted text-sm">Saldo devedor atual</p><p id="valor-devido" style="font-size:2.5rem;font-weight:800;color:var(--gold)">R$0,00</p><p class="text-muted text-sm mt-8">Total de gerações: <strong id="total-ger">0</strong></p></div><div style="text-align:right"><p class="text-muted text-sm mb-16">Para quitar, entre em contato:</p><a href="mailto:financeiro@auditcv.com" class="btn btn-primary">💳 Falar sobre pagamento</a></div></div></div>
+  <div class="card">
+    <h3 class="mb-24">Editar informações</h3>
+    <div class="info-grid">
+      <div class="form-group"><label class="form-label">Nome completo</label><input type="text" id="input-nome" class="form-control"/></div>
+      <div class="form-group"><label class="form-label">Telefone</label><input type="tel" id="input-tel" class="form-control" placeholder="(21) 99999-9999"/></div>
+      <div class="form-group" style="grid-column:1/-1"><label class="form-label">E-mail</label><input type="email" id="input-email" class="form-control" disabled style="opacity:.6"/></div>
+    </div>
+    <div class="flex justify-between mt-24 flex-wrap gap-12"><button class="btn btn-danger btn-sm" onclick="openModal('modal-delete')">🗑 Excluir conta</button><button class="btn btn-primary" id="btn-salvar" onclick="salvarPerfil()">Salvar alterações</button></div>
+  </div>
+</main>
+</div>
+<div class="modal-overlay" id="modal-delete"><div class="modal" style="max-width:400px;text-align:center"><div style="font-size:3rem;margin-bottom:12px">⚠️</div><h3>Excluir conta?</h3><p class="text-muted mt-8 mb-24">Ação irreversível. Todos seus dados serão apagados.</p><div class="flex gap-8 justify-center"><button class="btn btn-danger" onclick="excluirConta()">Sim, excluir</button><button class="btn btn-outline" onclick="closeModal('modal-delete')">Cancelar</button></div></div></div>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="assets/js/main.js"></script>
+<script>
+let currentUser;
+(async()=>{
+  currentUser=await requireAuth(); if(!currentUser) return;
+  const {data:u}=await sb.from('usuarios').select('*').eq('id',currentUser.id).single();
+  const {data:d}=await sb.from('debitos').select('*').eq('usuario_id',currentUser.id).single();
+  document.getElementById('avatar').src=currentUser.user_metadata?.avatar_url||'https://ui-avatars.com/api/?name=U&background=333&color=fff';
+  document.getElementById('nome-display').textContent=u?.nome||'Usuário';
+  document.getElementById('email-display').textContent=currentUser.email;
+  document.getElementById('input-nome').value=u?.nome||'';
+  document.getElementById('input-tel').value=u?.telefone||'';
+  document.getElementById('input-email').value=currentUser.email;
+  if(d){
+    document.getElementById('valor-devido').textContent=fmtBRL(d.valor_devido);
+    document.getElementById('total-ger').textContent=d.total_geracoes;
+    const sc={adimplente:'badge-green',pendente:'badge-gold',bloqueado:'badge-red'};
+    const sl={adimplente:'✅ Adimplente',pendente:'⚠️ Pendente',bloqueado:'🚫 Bloqueado'};
+    document.getElementById('status-badge').className=\`badge \${sc[d.status]||'badge-gray'} mt-8\`;
+    document.getElementById('status-badge').textContent=sl[d.status]||d.status;
+  }
+})();
+async function salvarPerfil(){
+  const nome=document.getElementById('input-nome').value.trim();
+  const tel=document.getElementById('input-tel').value.trim();
+  const btn=document.getElementById('btn-salvar');
+  setLoading(btn,true);
+  const {error}=await sb.from('usuarios').update({nome,telefone:tel}).eq('id',currentUser.id);
+  setLoading(btn,false,'Salvar alterações');
+  if(error) toast('Erro: '+error.message,'error');
+  else{toast('Perfil atualizado!','success');document.getElementById('nome-display').textContent=nome;}
+}
+async function excluirConta(){
+  await sb.from('geracoes').delete().eq('usuario_id',currentUser.id);
+  await sb.from('debitos').delete().eq('usuario_id',currentUser.id);
+  await sb.from('usuarios').delete().eq('id',currentUser.id);
+  await sb.auth.signOut();
+  window.location.href='index.html';
+}
+</script>
+</body></html>`;}
+
+function getAdmin(){return `<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8"/><meta name="viewport" content="width=device-width,initial-scale=1.0"/>
+<title>AUDITCV — Admin</title>
+<link rel="stylesheet" href="assets/css/style.css"/>
+<style>
+.admin-badge{background:rgba(239,68,68,.15);border:1px solid rgba(239,68,68,.3);color:#F87171;padding:3px 12px;border-radius:999px;font-size:.75rem;font-weight:700}
+.filter-bar{display:flex;gap:12px;flex-wrap:wrap;align-items:center;margin-bottom:20px}
+.search-input{flex:1;min-width:200px;background:rgba(255,255,255,.04);border:1px solid var(--border);border-radius:10px;color:var(--text);font-family:'Inter',sans-serif;font-size:.9rem;padding:10px 16px}
+.search-input:focus{outline:none;border-color:var(--gold)}
+select.filter-select{background:rgba(255,255,255,.04);border:1px solid var(--border);border-radius:10px;color:var(--text);font-family:'Inter',sans-serif;font-size:.9rem;padding:10px 16px;cursor:pointer}
+select.filter-select option{background:var(--bg3)}
+</style>
+</head>
+<body>
+<nav class="navbar"><a href="index.html" class="navbar-brand">✦ AUDITCV</a><div class="navbar-links"><span class="admin-badge">🔐 Admin</span><button class="btn btn-ghost btn-sm" onclick="signOut()">Sair</button></div></nav>
+<div class="app-layout">
+<aside class="sidebar">
+  <span class="sidebar-label">Admin</span>
+  <a href="#" class="sidebar-link active" onclick="showSection('stats',this)"><svg fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>Visão Geral</a>
+  <a href="#" class="sidebar-link" onclick="showSection('usuarios',this)"><svg fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><circle cx="12" cy="8" r="4"/><path d="M4 20c0-4 3.6-7 8-7s8 3 8 7"/></svg>Usuários</a>
+  <a href="#" class="sidebar-link" onclick="showSection('geracoes',this)"><svg fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>Gerações</a>
+  <a href="#" class="sidebar-link" onclick="showSection('debitos',this)"><svg fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M12 1v22M17 5H9.5a3.5 3.5 0 000 7h5a3.5 3.5 0 010 7H6"/></svg>Débitos</a>
+  <div style="flex:1"></div>
+  <a href="dashboard.html" class="sidebar-link">← Área do usuário</a>
+</aside>
+<main class="main-content">
+  <div id="section-stats">
+    <div class="page-header"><h1>Visão Geral <span class="admin-badge" style="font-size:.7rem;vertical-align:middle">Admin</span></h1></div>
+    <div class="stats-grid"><div class="card stat-card"><div class="stat-label">Total usuários</div><div class="stat-value text-gold" id="s-usuarios">—</div></div><div class="card stat-card"><div class="stat-label">Total gerações</div><div class="stat-value" id="s-geracoes">—</div></div><div class="card stat-card"><div class="stat-label">Receita total</div><div class="stat-value text-gold" id="s-receita">—</div></div><div class="card stat-card"><div class="stat-label">Pendente cobrar</div><div class="stat-value" id="s-pendente">—</div></div></div>
+    <div class="card"><h3 class="mb-16">Resumo por modelo</h3><div class="table-wrap"><table><thead><tr><th>Modelo</th><th>Gerações</th><th>Receita</th></tr></thead><tbody id="tbody-modelos"></tbody></table></div></div>
+  </div>
+  <div id="section-usuarios" class="hidden">
+    <div class="page-header"><h1>Usuários</h1></div>
+    <div class="filter-bar"><input class="search-input" id="search-users" placeholder="Buscar nome ou email..." oninput="filtrarUsuarios()"/><select class="filter-select" id="filter-status" onchange="filtrarUsuarios()"><option value="">Todos</option><option value="adimplente">Adimplente</option><option value="pendente">Pendente</option><option value="bloqueado">Bloqueado</option></select></div>
+    <div class="card table-wrap"><table><thead><tr><th>Usuário</th><th>Email</th><th>Gerações</th><th>Valor devido</th><th>Status</th><th>Cadastro</th><th>Ações</th></tr></thead><tbody id="tbody-usuarios"></tbody></table></div>
+  </div>
+  <div id="section-geracoes" class="hidden">
+    <div class="page-header"><h1>Gerações</h1></div>
+    <div class="filter-bar"><input class="search-input" id="search-ger" placeholder="Buscar cargo..." oninput="filtrarGeracoes()"/><select class="filter-select" id="filter-modelo" onchange="filtrarGeracoes()"><option value="">Todos</option><option value="simple">Simples</option><option value="ats">ATS Pro</option><option value="ia_magica">IA Mágica</option></select><select class="filter-select" id="filter-pag" onchange="filtrarGeracoes()"><option value="">Todos</option><option value="pendente">Pendente</option><option value="pago">Pago</option></select></div>
+    <div class="card table-wrap"><table><thead><tr><th>#</th><th>Usuário</th><th>Cargo</th><th>Modelo</th><th>Data</th><th>Pagamento</th><th></th></tr></thead><tbody id="tbody-todas-geracoes"></tbody></table></div>
+  </div>
+  <div id="section-debitos" class="hidden">
+    <div class="page-header"><h1>Débitos</h1></div>
+    <div class="card table-wrap"><table><thead><tr><th>Usuário</th><th>Gerações</th><th>Valor</th><th>Status</th><th>Última geração</th><th>Ações</th></tr></thead><tbody id="tbody-debitos"></tbody></table></div>
+  </div>
+</main>
+</div>
+<div class="modal-overlay" id="modal-cv-admin"><div class="modal" style="max-width:700px"><div class="modal-header"><h3>Currículo</h3><button class="modal-close" onclick="closeModal('modal-cv-admin')">×</button></div><div id="modal-cv-admin-content" style="white-space:pre-wrap;font-size:.9rem;color:var(--text-muted);max-height:60vh;overflow-y:auto;line-height:1.8"></div></div></div>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="assets/js/main.js"></script>
+<script>
+let allU=[],allG=[],allD=[];
+const precos={simple:9,ats:19,ia_magica:39};
+const mL={simple:'Simples',ats:'ATS Pro',ia_magica:'IA Mágica'};
+(async()=>{
+  const user=await requireAdmin(); if(!user) return;
+  await load();
+  renderStats();renderU();renderG();renderD();
+})();
+async function load(){
+  const [u,g,d]=await Promise.all([sb.from('usuarios').select('*').order('created_at',{ascending:false}),sb.from('geracoes').select('*').order('data_geracao',{ascending:false}),sb.from('debitos').select('*').order('valor_devido',{ascending:false})]);
+  allU=u.data||[];allG=g.data||[];allD=d.data||[];
+}
+function renderStats(){
+  document.getElementById('s-usuarios').textContent=allU.length;
+  document.getElementById('s-geracoes').textContent=allG.length;
+  document.getElementById('s-receita').textContent=fmtBRL(allG.filter(g=>g.status_pagamento==='pago').reduce((a,g)=>a+(precos[g.modelo]||0),0));
+  document.getElementById('s-pendente').textContent=fmtBRL(allG.filter(g=>g.status_pagamento!=='pago').reduce((a,g)=>a+(precos[g.modelo]||0),0));
+  const bm={};allG.forEach(g=>{bm[g.modelo]=bm[g.modelo]||{count:0,receita:0};bm[g.modelo].count++;bm[g.modelo].receita+=(precos[g.modelo]||0);});
+  document.getElementById('tbody-modelos').innerHTML=Object.entries(bm).map(([m,v])=>\`<tr><td>\${mL[m]||m}</td><td>\${v.count}</td><td>\${fmtBRL(v.receita)}</td></tr>\`).join('');
+}
+function renderU(list=allU){
+  const dm=Object.fromEntries(allD.map(d=>[d.usuario_id,d]));
+  const sc={adimplente:'badge-green',pendente:'badge-gold',bloqueado:'badge-red'};
+  document.getElementById('tbody-usuarios').innerHTML=list.map(u=>{const deb=dm[u.id]||{};return\`<tr><td>\${u.nome||'—'}</td><td class="text-muted">\${u.email}</td><td>\${deb.total_geracoes||0}</td><td>\${fmtBRL(deb.valor_devido)}</td><td><span class="badge \${sc[deb.status]||'badge-gray'}">\${deb.status||'—'}</span></td><td class="text-muted">\${fmtDate(u.created_at)}</td><td><div style="display:flex;gap:4px"><button class="btn btn-outline btn-sm" onclick="marcarPago('\${u.id}')">💳 Pago</button><button class="btn btn-danger btn-sm" onclick="alterarStatus('\${u.id}','bloqueado')">Bloquear</button></div></td></tr>\`;}).join('')||'<tr><td colspan="7" class="text-center text-muted" style="padding:40px">Nenhum usuário.</td></tr>';
+}
+function renderG(list=allG){
+  const um=Object.fromEntries(allU.map(u=>[u.id,u]));
+  document.getElementById('tbody-todas-geracoes').innerHTML=list.map(g=>{const u=um[g.usuario_id]||{};return\`<tr><td class="text-muted">#\${g.id}</td><td>\${u.nome||u.email||'—'}</td><td><strong>\${g.cargo_alvo||'—'}</strong></td><td>\${mL[g.modelo]||g.modelo}</td><td class="text-muted">\${fmtDate(g.data_geracao)}</td><td><span class="badge \${g.status_pagamento==='pago'?'badge-green':'badge-gold'}">\${g.status_pagamento==='pago'?'Pago':'Pendente'}</span></td><td><button class="btn btn-ghost btn-sm" onclick="document.getElementById('modal-cv-admin-content').textContent=\${JSON.stringify(g.conteudo_gerado||'').replace(/'/g,\\"\\\\\\'\\")}||'—';openModal('modal-cv-admin')">Ver</button></td></tr>\`;}).join('')||'<tr><td colspan="7" class="text-center text-muted" style="padding:40px">Nenhuma geração.</td></tr>';
+}
+function renderD(){
+  const um=Object.fromEntries(allU.map(u=>[u.id,u]));
+  const sc={adimplente:'badge-green',pendente:'badge-gold',bloqueado:'badge-red'};
+  document.getElementById('tbody-debitos').innerHTML=allD.map(d=>{const u=um[d.usuario_id]||{};return\`<tr><td>\${u.nome||u.email||d.usuario_id.slice(0,8)}</td><td>\${d.total_geracoes}</td><td><strong>\${fmtBRL(d.valor_devido)}</strong></td><td><span class="badge \${sc[d.status]||'badge-gray'}">\${d.status}</span></td><td class="text-muted">\${fmtDate(d.ultima_geracao)}</td><td><div style="display:flex;gap:4px"><button class="btn btn-outline btn-sm" onclick="marcarPago('\${d.usuario_id}')">💳 Recebido</button><button class="btn btn-danger btn-sm" onclick="alterarStatus('\${d.usuario_id}','bloqueado')">Bloquear</button></div></td></tr>\`;}).join('')||'<tr><td colspan="6" class="text-center text-muted" style="padding:40px">Sem débitos.</td></tr>';
+}
+async function alterarStatus(uid,status){await sb.from('debitos').update({status,updated_at:new Date().toISOString()}).eq('usuario_id',uid);await load();renderU();renderD();toast('Status: '+status,'success');}
+async function marcarPago(uid){await sb.from('geracoes').update({status_pagamento:'pago'}).eq('usuario_id',uid).eq('status_pagamento','pendente');await sb.from('debitos').update({valor_devido:0,status:'adimplente',updated_at:new Date().toISOString()}).eq('usuario_id',uid);await load();renderStats();renderU();renderG();renderD();toast('Pagamento registrado!','success');}
+function filtrarUsuarios(){const q=document.getElementById('search-users').value.toLowerCase();const s=document.getElementById('filter-status').value;const dm=Object.fromEntries(allD.map(d=>[d.usuario_id,d]));renderU(allU.filter(u=>(!q||(u.nome||'').toLowerCase().includes(q)||(u.email||'').toLowerCase().includes(q))&&(!s||(dm[u.id]?.status===s))));}
+function filtrarGeracoes(){const q=document.getElementById('search-ger').value.toLowerCase();const m=document.getElementById('filter-modelo').value;const p=document.getElementById('filter-pag').value;renderG(allG.filter(g=>(!q||(g.cargo_alvo||'').toLowerCase().includes(q))&&(!m||g.modelo===m)&&(!p||g.status_pagamento===p)));}
+function showSection(name,el){['stats','usuarios','geracoes','debitos'].forEach(s=>document.getElementById('section-'+s).classList.toggle('hidden',s!==name));document.querySelectorAll('.sidebar-link').forEach(l=>l.classList.remove('active'));el?.classList.add('active');return false;}
+</script>
+</body></html>`;}
+
+function get404(){return `<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8"/><meta name="viewport" content="width=device-width,initial-scale=1.0"/>
+<title>Página não encontrada — AUDITCV</title>
+<link rel="stylesheet" href="assets/css/style.css"/>
+</head>
+<body style="display:flex;align-items:center;justify-content:center;min-height:100vh;text-align:center;padding:20px">
+<div>
+  <div style="font-size:5rem;margin-bottom:16px">🔍</div>
+  <h1 style="font-size:4rem;color:var(--gold);margin-bottom:8px">404</h1>
+  <p style="color:var(--text-muted);margin-bottom:32px">Esta página não existe ou foi removida.</p>
+  <a href="index.html" class="btn btn-primary">← Voltar ao início</a>
+</div>
+</body></html>`;}
+
+function getReadme(){return `# ✦ AUDITCV — Gerador de Currículos com IA
+
+> WebApp de geração de currículos profissionais usando Claude IA, Supabase e GitHub Pages.
+
+## 🚀 Stack
+- **Frontend:** HTML puro + CSS + JavaScript (sem frameworks)
+- **Backend/Auth:** Supabase (PostgreSQL + Auth + RLS)
+- **IA:** Anthropic Claude API (Haiku)
+- **Hosting:** GitHub Pages (gratuito)
+
+## 📁 Estrutura
+\`\`\`
+/
+├── index.html          → Landing page
+├── login.html          → Login (Google + Magic Link)
+├── dashboard.html      → Área do usuário
+├── gerador.html        → Gerador de currículos (3 passos)
+├── perfil.html         → Perfil e saldo devedor
+├── admin.html          → Painel admin (oculto)
+├── 404.html            → Página de erro
+└── assets/
+    ├── css/style.css   → Design system completo
+    └── js/main.js      → Utils: auth, toasts, helpers
+\`\`\`
+
+## ⚙️ Configuração
+
+### 1. Supabase
+- Crie um projeto em [supabase.com](https://supabase.com)
+- Execute o SQL de setup em **SQL Editor**
+- Ative **Google Auth** em Authentication > Providers
+
+### 2. Credenciais (assets/js/main.js)
+\`\`\`js
+const SUPABASE_URL     = 'https://xxxx.supabase.co';
+const SUPABASE_ANON_KEY = 'sua_anon_key';
+const CLAUDE_KEY        = 'sk-ant-...';
+\`\`\`
+
+### 3. GitHub Pages
+- Suba todos os arquivos no repositório
+- Ative em **Settings → Pages → Deploy from branch: main**
+
+### 4. Admin
+\`\`\`sql
+INSERT INTO admins VALUES ('seu@email.com');
+\`\`\`
+
+## 💰 Modelos e Preços
+| Modelo     | Preço/geração | Descrição |
+|------------|---------------|-----------|
+| Simples    | R$9           | Revisão profissional |
+| ATS Pro    | R$19          | Otimizado para triagem |
+| IA Mágica  | R$39          | Reescrita narrativa completa |
+
+## 🔐 Segurança
+- Row Level Security (RLS) ativado em todas as tabelas
+- Usuários acessam apenas seus próprios dados
+- Admin verificado via tabela \`admins\` no Supabase
+
+---
+Construído com ❤️ e IA.`;}
+</script>
+</body>
+</html>

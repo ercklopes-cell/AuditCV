@@ -1,0 +1,313 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>AUDITCV — Gerar Currículo</title>
+  <link rel="stylesheet" href="assets/css/style.css" />
+  <style>
+    .step-indicator {
+      display:flex; align-items:center; gap:0; margin-bottom:40px;
+    }
+    .step {
+      display:flex; align-items:center; gap:10px;
+      font-size:.85rem; font-weight:600; color:var(--text-muted);
+    }
+    .step.active { color:var(--gold); }
+    .step.done   { color:#34D399; }
+    .step-num {
+      width:28px; height:28px; border-radius:50%;
+      display:flex; align-items:center; justify-content:center;
+      font-size:.8rem; font-weight:700;
+      background:var(--bg3); border:2px solid var(--border);
+    }
+    .step.active .step-num { background:var(--gold); border-color:var(--gold); color:#0B1120; }
+    .step.done   .step-num { background:#34D399; border-color:#34D399; color:#0B1120; }
+    .step-line { flex:1; height:2px; background:var(--border); margin:0 8px; min-width:32px; }
+    .step-line.done { background:#34D399; }
+
+    /* Modelo cards */
+    .modelo-grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(200px,1fr)); gap:16px; }
+    .modelo-option {
+      border:2px solid var(--border); border-radius:var(--radius-lg);
+      padding:20px; cursor:pointer; transition:all .25s; text-align:center;
+    }
+    .modelo-option:hover { border-color:var(--gold); background:var(--gold-glow); }
+    .modelo-option.selected { border-color:var(--gold); background:var(--gold-glow); box-shadow:0 0 20px rgba(245,176,65,.2); }
+    .modelo-option .icon  { font-size:2rem; margin-bottom:10px; }
+    .modelo-option h4     { font-size:1rem; margin-bottom:4px; }
+    .modelo-option .price { color:var(--gold); font-weight:700; font-size:.95rem; }
+    .modelo-option p      { font-size:.8rem; color:var(--text-muted); margin-top:6px; }
+
+    /* Output */
+    .output-box {
+      background:rgba(0,0,0,.3); border:1px solid var(--border);
+      border-radius:var(--radius); padding:24px;
+      white-space:pre-wrap; font-size:.9rem; line-height:1.9;
+      min-height:300px; color:var(--text); font-family:'Inter',sans-serif;
+    }
+    .generating-animation { display:flex; flex-direction:column; align-items:center; justify-content:center; min-height:300px; gap:16px; }
+    .gen-spinner {
+      width:56px; height:56px; border-radius:50%;
+      border:4px solid rgba(245,176,65,.2); border-top-color:var(--gold);
+      animation:spin .8s linear infinite;
+    }
+  </style>
+</head>
+<body>
+
+<nav class="navbar">
+  <a href="index.html" class="navbar-brand">✦ AUDITCV</a>
+  <div class="navbar-links">
+    <a href="dashboard.html" class="nav-link">← Dashboard</a>
+  </div>
+</nav>
+
+<div class="app-layout">
+  <aside class="sidebar">
+    <a href="dashboard.html" class="sidebar-link">
+      <svg fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>
+      Dashboard
+    </a>
+    <a href="gerador.html" class="sidebar-link active">
+      <svg fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M12 4v16m-8-8h16"/></svg>
+      Gerar Currículo
+    </a>
+    <a href="perfil.html" class="sidebar-link">
+      <svg fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><circle cx="12" cy="8" r="4"/><path d="M4 20c0-4 3.6-7 8-7s8 3 8 7"/></svg>
+      Meu Perfil
+    </a>
+    <div style="flex:1"></div>
+    <button class="btn btn-ghost btn-sm" style="justify-content:flex-start;gap:8px;color:var(--text-muted)" onclick="signOut()">
+      <svg width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M9 21H5a2 2 0 01-2-2V5a2 2 0 012-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
+      Sair
+    </button>
+  </aside>
+
+  <main class="main-content">
+    <div class="page-header">
+      <h1>✦ Gerar Currículo</h1>
+      <p class="text-muted">Cole seu currículo atual, escolha o modelo e deixe a IA trabalhar</p>
+    </div>
+
+    <!-- Step Indicator -->
+    <div class="step-indicator">
+      <div class="step active" id="step-1"><div class="step-num">1</div> Modelo</div>
+      <div class="step-line" id="line-1"></div>
+      <div class="step" id="step-2"><div class="step-num">2</div> Dados</div>
+      <div class="step-line" id="line-2"></div>
+      <div class="step" id="step-3"><div class="step-num">3</div> Resultado</div>
+    </div>
+
+    <!-- PASSO 1: Modelo -->
+    <div id="passo-1">
+      <h3 class="mb-16">Escolha o modelo</h3>
+      <div class="modelo-grid" id="modelo-grid">
+        <div class="modelo-option selected" data-modelo="simple" onclick="selecionarModelo(this)">
+          <div class="icon">📄</div>
+          <h4>Simples</h4>
+          <div class="price">R$9/geração</div>
+          <p>Revisão profissional e estrutura padrão</p>
+        </div>
+        <div class="modelo-option" data-modelo="ats" onclick="selecionarModelo(this)">
+          <div class="icon">🎯</div>
+          <h4>ATS Pro</h4>
+          <div class="price">R$19/geração</div>
+          <p>Otimizado para sistemas de triagem automática</p>
+        </div>
+        <div class="modelo-option" data-modelo="ia_magica" onclick="selecionarModelo(this)">
+          <div class="icon">✨</div>
+          <h4>IA Mágica</h4>
+          <div class="price">R$39/geração</div>
+          <p>Reescrita narrativa completa + carta de apresentação</p>
+        </div>
+      </div>
+      <div class="flex justify-between mt-24">
+        <div></div>
+        <button class="btn btn-primary" onclick="irPasso(2)">Próximo →</button>
+      </div>
+    </div>
+
+    <!-- PASSO 2: Dados -->
+    <div id="passo-2" class="hidden">
+      <div style="display:grid;gap:20px">
+        <div class="form-group">
+          <label class="form-label">Cargo alvo *</label>
+          <input type="text" id="cargo-alvo" class="form-control" placeholder="Ex: Gerente de Vendas, Analista de Marketing..." />
+        </div>
+        <div class="form-group">
+          <label class="form-label">Currículo atual (cole aqui) *</label>
+          <textarea id="curriculo-original" class="form-control" rows="14" placeholder="Cole seu currículo atual aqui. Pode ser em qualquer formato — texto corrido, tópicos, LinkedIn, Word colado...&#10;&#10;Quanto mais detalhado, melhor o resultado da IA."></textarea>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Observações adicionais (opcional)</label>
+          <textarea id="obs-extras" class="form-control" rows="3" placeholder="Ex: foco em liderança, quero destacar minha experiência internacional, empresa é startup de tecnologia..."></textarea>
+        </div>
+      </div>
+      <div class="flex justify-between mt-24">
+        <button class="btn btn-outline" onclick="irPasso(1)">← Voltar</button>
+        <button class="btn btn-primary" id="btn-gerar" onclick="gerarCurriculo()">✦ Gerar com IA</button>
+      </div>
+    </div>
+
+    <!-- PASSO 3: Resultado -->
+    <div id="passo-3" class="hidden">
+      <div id="resultado-loading" class="card generating-animation">
+        <div class="gen-spinner"></div>
+        <p class="text-gold" style="font-weight:600">A IA está reescrevendo seu currículo...</p>
+        <p class="text-muted text-sm">Isso pode levar até 30 segundos</p>
+      </div>
+
+      <div id="resultado-content" class="hidden">
+        <div class="flex justify-between items-center mb-16">
+          <h3>✅ Currículo gerado com sucesso!</h3>
+          <div class="flex gap-8">
+            <button class="btn btn-outline btn-sm" onclick="copiarResultado()">📋 Copiar</button>
+            <button class="btn btn-primary btn-sm" onclick="novaGeracao()">+ Nova geração</button>
+          </div>
+        </div>
+        <div class="output-box" id="output-text"></div>
+
+        <div class="card mt-24" style="background:rgba(245,176,65,.05);border-color:rgba(245,176,65,.3)">
+          <div class="flex justify-between items-center flex-wrap gap-16">
+            <div>
+              <p style="font-weight:600">Esta geração foi registrada no seu histórico.</p>
+              <p class="text-muted text-sm mt-8">O valor será cobrado conforme seu modelo. Acesse <a href="perfil.html">Meu Perfil</a> para ver seu saldo.</p>
+            </div>
+            <a href="dashboard.html" class="btn btn-outline btn-sm">Ver histórico →</a>
+          </div>
+        </div>
+      </div>
+    </div>
+
+  </main>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="assets/js/main.js"></script>
+<script>
+let modeloSelecionado = 'simple';
+let currentUser = null;
+
+const precos = { simple: 9, ats: 19, ia_magica: 39 };
+
+(async () => {
+  currentUser = await requireAuth();
+  if (!currentUser) return;
+
+  // Verifica bloqueio
+  const { data: deb } = await sb.from('debitos').select('status').eq('usuario_id', currentUser.id).single();
+  if (deb?.status === 'bloqueado') {
+    toast('Sua conta está bloqueada por débitos. Regularize para gerar novos currículos.', 'error', 8000);
+    document.getElementById('btn-gerar').disabled = true;
+  }
+})();
+
+function selecionarModelo(el) {
+  document.querySelectorAll('.modelo-option').forEach(e => e.classList.remove('selected'));
+  el.classList.add('selected');
+  modeloSelecionado = el.dataset.modelo;
+}
+
+function irPasso(num) {
+  [1,2,3].forEach(n => {
+    document.getElementById(`passo-${n}`).classList.toggle('hidden', n !== num);
+    const step = document.getElementById(`step-${n}`);
+    step.classList.remove('active','done');
+    if (n < num) step.classList.add('done');
+    if (n === num) step.classList.add('active');
+  });
+  [1,2].forEach(n => {
+    document.getElementById(`line-${n}`)?.classList.toggle('done', n < num);
+  });
+}
+
+async function gerarCurriculo() {
+  const cargo  = document.getElementById('cargo-alvo').value.trim();
+  const orig   = document.getElementById('curriculo-original').value.trim();
+  const obs    = document.getElementById('obs-extras').value.trim();
+
+  if (!cargo) { toast('Informe o cargo alvo', 'error'); return; }
+  if (!orig)  { toast('Cole seu currículo atual', 'error'); return; }
+
+  const btn = document.getElementById('btn-gerar');
+  setLoading(btn, true, 'Gerando...');
+  irPasso(3);
+
+  const prompts = {
+    simple: `Você é um especialista em RH e redação de currículos. Reescreva o currículo abaixo de forma profissional, clara e objetiva para o cargo de "${cargo}". Mantenha todas as informações verdadeiras, melhore a linguagem e a estrutura. Retorne APENAS o currículo reescrito em texto formatado, sem comentários.`,
+    ats: `Você é um especialista em ATS (Applicant Tracking Systems) e otimização de currículos. Reescreva o currículo abaixo para maximizar a compatibilidade com sistemas ATS para o cargo de "${cargo}". Use palavras-chave relevantes do setor, verbos de ação, métricas e resultados quantificáveis. Ao final, adicione uma seção "💡 Dicas de otimização" com 3 sugestões. Retorne APENAS o currículo + dicas, sem outros comentários.`,
+    ia_magica: `Você é um ghostwriter executivo especialista em currículos de alto impacto. Reescreva completamente o currículo abaixo para o cargo de "${cargo}" com uma narrativa poderosa, diferenciada e persuasiva. Destaque conquistas com números, crie uma proposta de valor única e inclua: 1) Currículo completo reescrito, 2) Carta de apresentação impactante (máx. 3 parágrafos), 3) Sugestão de headline do LinkedIn. Retorne tudo formatado e separado por seções.`
+  };
+
+  const systemPrompt = prompts[modeloSelecionado];
+  const userMsg = `CARGO ALVO: ${cargo}\n\nCURRÍCULO ATUAL:\n${orig}${obs ? '\n\nOBSERVAÇÕES DO USUÁRIO:\n' + obs : ''}`;
+
+  try {
+    const resp = await fetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'x-api-key': CLAUDE_KEY, 'anthropic-version': '2023-06-01' },
+      body: JSON.stringify({
+        model: 'claude-haiku-4-5-20251001',
+        max_tokens: 2000,
+        system: systemPrompt,
+        messages: [{ role: 'user', content: userMsg }]
+      })
+    });
+    const data = await resp.json();
+    const conteudoGerado = data.content?.[0]?.text || 'Erro ao gerar conteúdo.';
+
+    // Salvar no Supabase
+    const { data: geracao } = await sb.from('geracoes').insert({
+      usuario_id: currentUser.id,
+      modelo: modeloSelecionado,
+      cargo_alvo: cargo,
+      conteudo_original: orig,
+      conteudo_gerado: conteudoGerado,
+      status_pagamento: 'pendente'
+    }).select().single();
+
+    // Atualizar débitos
+    const preco = precos[modeloSelecionado];
+    await sb.rpc('incrementar_debito', { uid: currentUser.id, valor: preco });
+    // fallback manual se RPC não existir
+    const { data: deb } = await sb.from('debitos').select('*').eq('usuario_id', currentUser.id).single();
+    if (deb) {
+      await sb.from('debitos').update({
+        total_geracoes: (deb.total_geracoes || 0) + 1,
+        valor_devido:   parseFloat(deb.valor_devido || 0) + preco,
+        status: (parseFloat(deb.valor_devido || 0) + preco) > 0 ? 'pendente' : 'adimplente',
+        ultima_geracao: new Date().toISOString(),
+        updated_at:     new Date().toISOString()
+      }).eq('usuario_id', currentUser.id);
+    }
+
+    // Exibir resultado
+    document.getElementById('resultado-loading').classList.add('hidden');
+    document.getElementById('resultado-content').classList.remove('hidden');
+    document.getElementById('output-text').textContent = conteudoGerado;
+    toast('✅ Currículo gerado com sucesso!', 'success');
+
+  } catch (err) {
+    irPasso(2);
+    setLoading(btn, false);
+    toast('Erro ao chamar a IA: ' + err.message, 'error');
+  }
+}
+
+function copiarResultado() {
+  navigator.clipboard.writeText(document.getElementById('output-text').textContent)
+    .then(() => toast('Copiado para a área de transferência!', 'success'));
+}
+
+function novaGeracao() {
+  document.getElementById('curriculo-original').value = '';
+  document.getElementById('cargo-alvo').value = '';
+  document.getElementById('obs-extras').value = '';
+  document.getElementById('resultado-loading').classList.remove('hidden');
+  document.getElementById('resultado-content').classList.add('hidden');
+  irPasso(1);
+}
+</script>
+</body>
+</html>

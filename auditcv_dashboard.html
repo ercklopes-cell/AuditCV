@@ -1,0 +1,229 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>AUDITCV — Dashboard</title>
+  <link rel="stylesheet" href="assets/css/style.css" />
+  <style>
+    .welcome-bar {
+      display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:16px;
+      margin-bottom:32px;
+    }
+    .avatar {
+      width:40px; height:40px; border-radius:50%;
+      border:2px solid var(--gold); object-fit:cover;
+      background:var(--gold-glow);
+    }
+    .debito-alert {
+      background:rgba(239,68,68,.1); border:1px solid rgba(239,68,68,.3);
+      border-radius:12px; padding:16px 20px;
+      display:flex; align-items:center; gap:12px;
+      margin-bottom:24px; color:#F87171;
+    }
+    .empty-state {
+      text-align:center; padding:60px 20px; color:var(--text-muted);
+    }
+    .empty-state .empty-icon { font-size:3rem; margin-bottom:12px; }
+    .model-badge {
+      display:inline-block; padding:2px 10px; border-radius:999px;
+      font-size:.75rem; font-weight:600;
+    }
+    .model-simple { background:rgba(107,114,128,.15); color:#9CA3AF; }
+    .model-ats    { background:rgba(59,130,246,.15);  color:#93C5FD; }
+    .model-ia     { background:rgba(245,176,65,.15);  color:var(--gold); }
+  </style>
+</head>
+<body>
+
+<!-- NAVBAR -->
+<nav class="navbar">
+  <a href="index.html" class="navbar-brand">✦ AUDITCV</a>
+  <div class="navbar-links" id="nav-user">
+    <button class="btn btn-ghost btn-sm" id="mobile-sidebar-toggle" style="display:none" onclick="document.querySelector('.sidebar').classList.toggle('open')">☰</button>
+  </div>
+</nav>
+
+<div class="app-layout">
+  <!-- SIDEBAR -->
+  <aside class="sidebar">
+    <a href="dashboard.html" class="sidebar-link active">
+      <svg fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>
+      Dashboard
+    </a>
+    <a href="gerador.html" class="sidebar-link">
+      <svg fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M12 4v16m-8-8h16"/></svg>
+      Gerar Currículo
+    </a>
+    <a href="perfil.html" class="sidebar-link">
+      <svg fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><circle cx="12" cy="8" r="4"/><path d="M4 20c0-4 3.6-7 8-7s8 3 8 7"/></svg>
+      Meu Perfil
+    </a>
+    <div style="flex:1"></div>
+    <button class="btn btn-ghost btn-sm" style="justify-content:flex-start;gap:8px;color:var(--text-muted)" onclick="signOut()">
+      <svg width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M9 21H5a2 2 0 01-2-2V5a2 2 0 012-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
+      Sair
+    </button>
+  </aside>
+
+  <!-- MAIN -->
+  <main class="main-content">
+
+    <!-- Welcome -->
+    <div class="welcome-bar">
+      <div class="flex items-center gap-16">
+        <img id="user-avatar" class="avatar" src="" alt="Avatar" />
+        <div>
+          <h1 style="font-size:1.4rem" id="user-name">Carregando...</h1>
+          <p class="text-muted text-sm" id="user-email"></p>
+        </div>
+      </div>
+      <a href="gerador.html" class="btn btn-primary">✦ Novo currículo</a>
+    </div>
+
+    <!-- Alerta de débito -->
+    <div id="debito-alert" class="debito-alert hidden">
+      ⚠️ <span id="debito-msg">Você possui débitos pendentes.</span>
+      <a href="perfil.html" style="margin-left:auto;color:#F87171;font-weight:600;font-size:.9rem">Ver detalhes →</a>
+    </div>
+
+    <!-- Stats -->
+    <div class="stats-grid">
+      <div class="card stat-card">
+        <div class="stat-label">Total gerado</div>
+        <div class="stat-value text-gold" id="stat-total">0</div>
+        <div class="stat-sub">currículos</div>
+      </div>
+      <div class="card stat-card">
+        <div class="stat-label">Valor devido</div>
+        <div class="stat-value" id="stat-valor">R$0</div>
+        <div class="stat-sub">pendente de pagamento</div>
+      </div>
+      <div class="card stat-card">
+        <div class="stat-label">Status da conta</div>
+        <div class="stat-value" id="stat-status" style="font-size:1.1rem;padding-top:6px">—</div>
+      </div>
+      <div class="card stat-card">
+        <div class="stat-label">Membro desde</div>
+        <div class="stat-value" id="stat-membro" style="font-size:1rem;padding-top:6px">—</div>
+      </div>
+    </div>
+
+    <!-- Histórico -->
+    <div class="card">
+      <div class="flex justify-between items-center mb-24">
+        <h2 style="font-size:1.1rem">Histórico de gerações</h2>
+        <a href="gerador.html" class="btn btn-outline btn-sm">+ Novo</a>
+      </div>
+
+      <div id="loading-hist" class="loading-full" style="min-height:200px">
+        <div class="spinner"></div>
+        <span>Carregando...</span>
+      </div>
+
+      <div id="empty-hist" class="empty-state hidden">
+        <div class="empty-icon">📄</div>
+        <p>Você ainda não gerou nenhum currículo.</p>
+        <a href="gerador.html" class="btn btn-primary mt-16">✦ Gerar meu primeiro currículo</a>
+      </div>
+
+      <div class="table-wrap hidden" id="tabela-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>#</th>
+              <th>Cargo alvo</th>
+              <th>Modelo</th>
+              <th>Gerado em</th>
+              <th>Status</th>
+              <th></th>
+            </tr>
+          </thead>
+          <tbody id="tbody-geracoes"></tbody>
+        </table>
+      </div>
+    </div>
+
+  </main>
+</div>
+
+<!-- MODAL VER CURRÍCULO -->
+<div class="modal-overlay" id="modal-cv">
+  <div class="modal" style="max-width:700px">
+    <div class="modal-header">
+      <h3>Currículo gerado</h3>
+      <button class="modal-close" onclick="closeModal('modal-cv')">×</button>
+    </div>
+    <div id="modal-cv-content" style="white-space:pre-wrap;font-size:.9rem;color:var(--text-muted);max-height:60vh;overflow-y:auto;line-height:1.8"></div>
+    <div class="flex gap-8 mt-24">
+      <button class="btn btn-primary" onclick="copiarCV()">📋 Copiar</button>
+      <button class="btn btn-outline" onclick="closeModal('modal-cv')">Fechar</button>
+    </div>
+  </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="assets/js/main.js"></script>
+<script>
+const modelLabels = { simple:'Simples', ats:'ATS Pro', ia_magica:'IA Mágica' };
+const modelClass  = { simple:'model-simple', ats:'model-ats', ia_magica:'model-ia' };
+const statusMap   = { adimplente:'✅ Adimplente', pendente:'⚠️ Pendente', bloqueado:'🚫 Bloqueado' };
+
+(async () => {
+  const user = await requireAuth();
+  if (!user) return;
+
+  // Avatar / nome
+  document.getElementById('user-avatar').src = user.user_metadata?.avatar_url || 'https://ui-avatars.com/api/?name=User&background=F5B041&color=0B1120';
+  document.getElementById('user-name').textContent  = user.user_metadata?.full_name || 'Usuário';
+  document.getElementById('user-email').textContent = user.email;
+  document.getElementById('stat-membro').textContent = fmtDate(user.created_at).split(',')[0];
+
+  // Debitos
+  const { data: deb } = await sb.from('debitos').select('*').eq('usuario_id', user.id).single();
+  if (deb) {
+    document.getElementById('stat-total').textContent = deb.total_geracoes;
+    document.getElementById('stat-valor').textContent = fmtBRL(deb.valor_devido);
+    document.getElementById('stat-status').innerHTML  = `<span class="badge badge-${deb.status === 'adimplente' ? 'green' : deb.status === 'pendente' ? 'gold' : 'red'}">${statusMap[deb.status]}</span>`;
+    if (deb.status !== 'adimplente') {
+      document.getElementById('debito-alert').classList.remove('hidden');
+      document.getElementById('debito-msg').textContent = `Você possui débito de ${fmtBRL(deb.valor_devido)} pendente.`;
+    }
+  }
+
+  // Geracoes
+  const { data: geracoes } = await sb.from('geracoes').select('*').eq('usuario_id', user.id).order('data_geracao', { ascending: false });
+
+  document.getElementById('loading-hist').classList.add('hidden');
+
+  if (!geracoes || geracoes.length === 0) {
+    document.getElementById('empty-hist').classList.remove('hidden');
+  } else {
+    document.getElementById('tabela-wrap').classList.remove('hidden');
+    const tbody = document.getElementById('tbody-geracoes');
+    geracoes.forEach((g, i) => {
+      tbody.innerHTML += `
+        <tr>
+          <td class="text-muted">#${g.id}</td>
+          <td><strong>${g.cargo_alvo || '—'}</strong></td>
+          <td><span class="model-badge ${modelClass[g.modelo]}">${modelLabels[g.modelo]}</span></td>
+          <td class="text-muted">${fmtDate(g.data_geracao)}</td>
+          <td><span class="badge badge-${g.status_pagamento === 'pago' ? 'green' : 'gold'}">${g.status_pagamento === 'pago' ? 'Pago' : 'Pendente'}</span></td>
+          <td><button class="btn btn-ghost btn-sm" onclick="verCV(${JSON.stringify(g.conteudo_gerado).replace(/"/g,'&quot;')})">Ver →</button></td>
+        </tr>`;
+    });
+  }
+})();
+
+function verCV(conteudo) {
+  document.getElementById('modal-cv-content').textContent = conteudo || 'Conteúdo não disponível.';
+  openModal('modal-cv');
+}
+
+function copiarCV() {
+  const txt = document.getElementById('modal-cv-content').textContent;
+  navigator.clipboard.writeText(txt).then(() => toast('Currículo copiado!', 'success'));
+}
+</script>
+</body>
+</html>

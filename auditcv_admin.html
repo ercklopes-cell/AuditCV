@@ -1,0 +1,347 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>AUDITCV — Admin</title>
+  <link rel="stylesheet" href="assets/css/style.css" />
+  <style>
+    .admin-badge {
+      background:rgba(239,68,68,.15); border:1px solid rgba(239,68,68,.3);
+      color:#F87171; padding:3px 12px; border-radius:999px; font-size:.75rem; font-weight:700;
+    }
+    .filter-bar {
+      display:flex; gap:12px; flex-wrap:wrap; align-items:center; margin-bottom:20px;
+    }
+    .search-input {
+      flex:1; min-width:200px;
+      background:rgba(255,255,255,.04); border:1px solid var(--border);
+      border-radius:10px; color:var(--text); font-family:'Inter',sans-serif;
+      font-size:.9rem; padding:10px 16px;
+    }
+    .search-input:focus { outline:none; border-color:var(--gold); }
+    select.filter-select {
+      background:rgba(255,255,255,.04); border:1px solid var(--border);
+      border-radius:10px; color:var(--text); font-family:'Inter',sans-serif;
+      font-size:.9rem; padding:10px 16px; cursor:pointer;
+    }
+    select.filter-select option { background:var(--bg3); }
+    .action-menu { position:relative; display:inline-block; }
+    .action-menu-content {
+      display:none; position:absolute; right:0; top:100%; z-index:50;
+      background:var(--bg3); border:1px solid var(--border); border-radius:10px;
+      padding:6px; min-width:160px; box-shadow:var(--shadow);
+    }
+    .action-menu:hover .action-menu-content { display:block; }
+    .action-item {
+      display:block; padding:8px 12px; border-radius:6px;
+      font-size:.85rem; color:var(--text-muted); cursor:pointer;
+      transition:all .2s; border:none; background:none; width:100%; text-align:left;
+    }
+    .action-item:hover { background:var(--gold-glow); color:var(--gold); }
+    .action-item.danger:hover { background:rgba(239,68,68,.1); color:#F87171; }
+  </style>
+</head>
+<body>
+
+<nav class="navbar">
+  <a href="index.html" class="navbar-brand">✦ AUDITCV</a>
+  <div class="navbar-links">
+    <span class="admin-badge">🔐 Admin</span>
+    <button class="btn btn-ghost btn-sm" onclick="signOut()">Sair</button>
+  </div>
+</nav>
+
+<div class="app-layout">
+  <aside class="sidebar">
+    <span class="sidebar-label">Admin</span>
+    <a href="#section-stats"    class="sidebar-link active" onclick="showSection('stats')">
+      <svg fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>
+      Visão Geral
+    </a>
+    <a href="#section-usuarios" class="sidebar-link" onclick="showSection('usuarios')">
+      <svg fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><circle cx="12" cy="8" r="4"/><path d="M4 20c0-4 3.6-7 8-7s8 3 8 7"/></svg>
+      Usuários
+    </a>
+    <a href="#section-geracoes" class="sidebar-link" onclick="showSection('geracoes')">
+      <svg fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+      Gerações
+    </a>
+    <a href="#section-debitos"  class="sidebar-link" onclick="showSection('debitos')">
+      <svg fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M12 1v22M17 5H9.5a3.5 3.5 0 000 7h5a3.5 3.5 0 010 7H6"/></svg>
+      Débitos
+    </a>
+    <div style="flex:1"></div>
+    <a href="dashboard.html" class="sidebar-link">← Área do usuário</a>
+  </aside>
+
+  <main class="main-content">
+
+    <!-- ── SEÇÃO: STATS ── -->
+    <div id="section-stats">
+      <div class="page-header">
+        <h1>Visão Geral <span class="admin-badge" style="font-size:.7rem;vertical-align:middle">Admin</span></h1>
+        <p class="text-muted">Painel de controle completo do AUDITCV</p>
+      </div>
+
+      <div class="stats-grid" id="admin-stats">
+        <div class="card stat-card"><div class="stat-label">Total usuários</div><div class="stat-value text-gold" id="s-usuarios">—</div></div>
+        <div class="card stat-card"><div class="stat-label">Total gerações</div><div class="stat-value" id="s-geracoes">—</div></div>
+        <div class="card stat-card"><div class="stat-label">Receita total</div><div class="stat-value text-gold" id="s-receita">—</div></div>
+        <div class="card stat-card"><div class="stat-label">Pendente cobrar</div><div class="stat-value" id="s-pendente">—</div></div>
+      </div>
+
+      <div class="card">
+        <h3 class="mb-16">Resumo por modelo</h3>
+        <table>
+          <thead><tr><th>Modelo</th><th>Gerações</th><th>Receita potencial</th></tr></thead>
+          <tbody id="tbody-modelos"></tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- ── SEÇÃO: USUÁRIOS ── -->
+    <div id="section-usuarios" class="hidden">
+      <div class="page-header"><h1>Usuários</h1><p class="text-muted">Gerencie todos os usuários cadastrados</p></div>
+      <div class="filter-bar">
+        <input class="search-input" id="search-users" placeholder="Buscar por nome ou email..." oninput="filtrarUsuarios()" />
+        <select class="filter-select" id="filter-status" onchange="filtrarUsuarios()">
+          <option value="">Todos os status</option>
+          <option value="adimplente">Adimplente</option>
+          <option value="pendente">Pendente</option>
+          <option value="bloqueado">Bloqueado</option>
+        </select>
+      </div>
+      <div class="card table-wrap">
+        <table>
+          <thead><tr><th>Usuário</th><th>Email</th><th>Gerações</th><th>Valor devido</th><th>Status</th><th>Cadastro</th><th></th></tr></thead>
+          <tbody id="tbody-usuarios"></tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- ── SEÇÃO: GERAÇÕES ── -->
+    <div id="section-geracoes" class="hidden">
+      <div class="page-header"><h1>Gerações</h1><p class="text-muted">Histórico completo de currículos gerados</p></div>
+      <div class="filter-bar">
+        <input class="search-input" id="search-ger" placeholder="Buscar cargo alvo..." oninput="filtrarGeracoes()" />
+        <select class="filter-select" id="filter-modelo" onchange="filtrarGeracoes()">
+          <option value="">Todos os modelos</option>
+          <option value="simple">Simples</option>
+          <option value="ats">ATS Pro</option>
+          <option value="ia_magica">IA Mágica</option>
+        </select>
+        <select class="filter-select" id="filter-pag" onchange="filtrarGeracoes()">
+          <option value="">Todos os pagamentos</option>
+          <option value="pendente">Pendente</option>
+          <option value="pago">Pago</option>
+        </select>
+      </div>
+      <div class="card table-wrap">
+        <table>
+          <thead><tr><th>#</th><th>Usuário</th><th>Cargo</th><th>Modelo</th><th>Data</th><th>Pagamento</th><th></th></tr></thead>
+          <tbody id="tbody-todas-geracoes"></tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- ── SEÇÃO: DÉBITOS ── -->
+    <div id="section-debitos" class="hidden">
+      <div class="page-header"><h1>Débitos</h1><p class="text-muted">Controle financeiro dos usuários</p></div>
+      <div class="card table-wrap">
+        <table>
+          <thead><tr><th>Usuário</th><th>Total gerações</th><th>Valor devido</th><th>Status</th><th>Última geração</th><th>Ações</th></tr></thead>
+          <tbody id="tbody-debitos"></tbody>
+        </table>
+      </div>
+    </div>
+
+  </main>
+</div>
+
+<!-- MODAL VER CURRÍCULO -->
+<div class="modal-overlay" id="modal-cv-admin">
+  <div class="modal" style="max-width:700px">
+    <div class="modal-header">
+      <h3>Currículo gerado</h3>
+      <button class="modal-close" onclick="closeModal('modal-cv-admin')">×</button>
+    </div>
+    <div id="modal-cv-admin-content" style="white-space:pre-wrap;font-size:.9rem;color:var(--text-muted);max-height:60vh;overflow-y:auto;line-height:1.8"></div>
+  </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="assets/js/main.js"></script>
+<script>
+let allUsuarios = [], allGeracoes = [], allDebitos = [];
+const precos = { simple:9, ats:19, ia_magica:39 };
+const modelLabels = { simple:'Simples', ats:'ATS Pro', ia_magica:'IA Mágica' };
+
+(async () => {
+  const user = await requireAdmin();
+  if (!user) return;
+  await carregarDados();
+  renderStats();
+  renderUsuarios();
+  renderGeracoes();
+  renderDebitos();
+})();
+
+async function carregarDados() {
+  const [u, g, d] = await Promise.all([
+    sb.from('usuarios').select('*').order('created_at', { ascending: false }),
+    sb.from('geracoes').select('*').order('data_geracao', { ascending: false }),
+    sb.from('debitos').select('*').order('valor_devido', { ascending: false })
+  ]);
+  allUsuarios = u.data || [];
+  allGeracoes = g.data || [];
+  allDebitos  = d.data || [];
+}
+
+function renderStats() {
+  document.getElementById('s-usuarios').textContent = allUsuarios.length;
+  document.getElementById('s-geracoes').textContent = allGeracoes.length;
+
+  const receitaTotal = allGeracoes.filter(g => g.status_pagamento === 'pago').reduce((a,g) => a + (precos[g.modelo]||0), 0);
+  const pendente     = allGeracoes.filter(g => g.status_pagamento !== 'pago').reduce((a,g) => a + (precos[g.modelo]||0), 0);
+
+  document.getElementById('s-receita').textContent  = fmtBRL(receitaTotal);
+  document.getElementById('s-pendente').textContent = fmtBRL(pendente);
+
+  const byModelo = {};
+  allGeracoes.forEach(g => {
+    byModelo[g.modelo] = byModelo[g.modelo] || { count:0, receita:0 };
+    byModelo[g.modelo].count++;
+    byModelo[g.modelo].receita += precos[g.modelo]||0;
+  });
+  const tbody = document.getElementById('tbody-modelos');
+  tbody.innerHTML = Object.entries(byModelo).map(([m,v]) =>
+    `<tr><td>${modelLabels[m]||m}</td><td>${v.count}</td><td>${fmtBRL(v.receita)}</td></tr>`
+  ).join('');
+}
+
+function renderUsuarios(list = allUsuarios) {
+  const debMap = Object.fromEntries(allDebitos.map(d => [d.usuario_id, d]));
+  const tbody = document.getElementById('tbody-usuarios');
+  tbody.innerHTML = list.map(u => {
+    const deb = debMap[u.id] || {};
+    const statusClass = { adimplente:'badge-green', pendente:'badge-gold', bloqueado:'badge-red' }[deb.status] || 'badge-gray';
+    return `<tr>
+      <td><div style="display:flex;align-items:center;gap:8px">
+        <img src="${u.avatar_url || 'https://ui-avatars.com/api/?name=U&background=333&color=fff'}" style="width:28px;height:28px;border-radius:50%;object-fit:cover" />
+        ${u.nome || '—'}
+      </div></td>
+      <td class="text-muted">${u.email}</td>
+      <td>${deb.total_geracoes || 0}</td>
+      <td>${fmtBRL(deb.valor_devido)}</td>
+      <td><span class="badge ${statusClass}">${deb.status || '—'}</span></td>
+      <td class="text-muted">${fmtDate(u.created_at)}</td>
+      <td>
+        <div class="action-menu">
+          <button class="btn btn-ghost btn-sm">⋯</button>
+          <div class="action-menu-content">
+            <button class="action-item" onclick="alterarStatus('${u.id}','adimplente')">✅ Marcar adimplente</button>
+            <button class="action-item" onclick="alterarStatus('${u.id}','pendente')">⚠️ Marcar pendente</button>
+            <button class="action-item danger" onclick="alterarStatus('${u.id}','bloqueado')">🚫 Bloquear</button>
+            <button class="action-item" onclick="marcarPago('${u.id}')">💳 Marcar pago</button>
+          </div>
+        </div>
+      </td>
+    </tr>`;
+  }).join('') || '<tr><td colspan="7" class="text-muted text-center" style="padding:40px">Nenhum usuário encontrado.</td></tr>';
+}
+
+function renderGeracoes(list = allGeracoes) {
+  const userMap = Object.fromEntries(allUsuarios.map(u => [u.id, u]));
+  const tbody = document.getElementById('tbody-todas-geracoes');
+  tbody.innerHTML = list.map(g => {
+    const u = userMap[g.usuario_id] || {};
+    return `<tr>
+      <td class="text-muted">#${g.id}</td>
+      <td>${u.nome || u.email || '—'}</td>
+      <td><strong>${g.cargo_alvo || '—'}</strong></td>
+      <td><span class="badge ${g.modelo==='ia_magica'?'badge-gold':g.modelo==='ats'?'badge-gray':'badge-gray'}">${modelLabels[g.modelo]}</span></td>
+      <td class="text-muted">${fmtDate(g.data_geracao)}</td>
+      <td><span class="badge ${g.status_pagamento==='pago'?'badge-green':'badge-gold'}">${g.status_pagamento==='pago'?'Pago':'Pendente'}</span></td>
+      <td><button class="btn btn-ghost btn-sm" onclick="verCVAdmin(${JSON.stringify(g.conteudo_gerado||'').replace(/"/g,'&quot;')})">Ver →</button></td>
+    </tr>`;
+  }).join('') || '<tr><td colspan="7" class="text-muted text-center" style="padding:40px">Nenhuma geração encontrada.</td></tr>';
+}
+
+function renderDebitos() {
+  const userMap = Object.fromEntries(allUsuarios.map(u => [u.id, u]));
+  const tbody = document.getElementById('tbody-debitos');
+  tbody.innerHTML = allDebitos.map(d => {
+    const u = userMap[d.usuario_id] || {};
+    const statusClass = { adimplente:'badge-green', pendente:'badge-gold', bloqueado:'badge-red' }[d.status] || 'badge-gray';
+    return `<tr>
+      <td>${u.nome || u.email || d.usuario_id.slice(0,8)+'...'}</td>
+      <td>${d.total_geracoes}</td>
+      <td><strong>${fmtBRL(d.valor_devido)}</strong></td>
+      <td><span class="badge ${statusClass}">${d.status}</span></td>
+      <td class="text-muted">${fmtDate(d.ultima_geracao)}</td>
+      <td>
+        <div style="display:flex;gap:6px">
+          <button class="btn btn-outline btn-sm" onclick="marcarPago('${d.usuario_id}')">💳 Recebido</button>
+          <button class="btn btn-danger btn-sm" onclick="alterarStatus('${d.usuario_id}','bloqueado')">Bloquear</button>
+        </div>
+      </td>
+    </tr>`;
+  }).join('') || '<tr><td colspan="6" class="text-muted text-center" style="padding:40px">Sem débitos registrados.</td></tr>';
+}
+
+async function alterarStatus(uid, status) {
+  await sb.from('debitos').update({ status, updated_at: new Date().toISOString() }).eq('usuario_id', uid);
+  await carregarDados();
+  renderUsuarios(); renderDebitos();
+  toast(`Status atualizado para: ${status}`, 'success');
+}
+
+async function marcarPago(uid) {
+  await sb.from('geracoes').update({ status_pagamento: 'pago' }).eq('usuario_id', uid).eq('status_pagamento', 'pendente');
+  await sb.from('debitos').update({ valor_devido: 0, status: 'adimplente', updated_at: new Date().toISOString() }).eq('usuario_id', uid);
+  await carregarDados();
+  renderStats(); renderUsuarios(); renderGeracoes(); renderDebitos();
+  toast('Pagamento registrado com sucesso!', 'success');
+}
+
+function filtrarUsuarios() {
+  const q = document.getElementById('search-users').value.toLowerCase();
+  const s = document.getElementById('filter-status').value;
+  const debMap = Object.fromEntries(allDebitos.map(d => [d.usuario_id, d]));
+  const filtered = allUsuarios.filter(u => {
+    const matchQ = !q || (u.nome||'').toLowerCase().includes(q) || (u.email||'').toLowerCase().includes(q);
+    const matchS = !s || (debMap[u.id]?.status === s);
+    return matchQ && matchS;
+  });
+  renderUsuarios(filtered);
+}
+
+function filtrarGeracoes() {
+  const q  = document.getElementById('search-ger').value.toLowerCase();
+  const m  = document.getElementById('filter-modelo').value;
+  const p  = document.getElementById('filter-pag').value;
+  const filtered = allGeracoes.filter(g => {
+    const matchQ = !q || (g.cargo_alvo||'').toLowerCase().includes(q);
+    const matchM = !m || g.modelo === m;
+    const matchP = !p || g.status_pagamento === p;
+    return matchQ && matchM && matchP;
+  });
+  renderGeracoes(filtered);
+}
+
+function showSection(name) {
+  ['stats','usuarios','geracoes','debitos'].forEach(s => {
+    document.getElementById(`section-${s}`).classList.toggle('hidden', s !== name);
+  });
+  document.querySelectorAll('.sidebar-link').forEach(l => l.classList.remove('active'));
+  event.currentTarget?.classList.add('active');
+}
+
+function verCVAdmin(conteudo) {
+  document.getElementById('modal-cv-admin-content').textContent = conteudo || '—';
+  openModal('modal-cv-admin');
+}
+</script>
+</body>
+</html>

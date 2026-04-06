@@ -1,0 +1,231 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>AUDITCV — Currículo com IA que passa em tudo</title>
+  <link rel="stylesheet" href="assets/css/style.css" />
+  <style>
+    /* ── Hero ── */
+    .hero {
+      min-height: 100vh;
+      display: flex; align-items: center; justify-content: center;
+      text-align: center; padding: 120px 20px 80px;
+      position: relative; overflow: hidden;
+    }
+    .hero::before {
+      content: '';
+      position: absolute; top: -200px; left: 50%; transform: translateX(-50%);
+      width: 800px; height: 800px; border-radius: 50%;
+      background: radial-gradient(circle, rgba(245,176,65,.08) 0%, transparent 70%);
+      pointer-events: none;
+    }
+    .hero-badge {
+      display: inline-flex; align-items: center; gap: 8px;
+      background: rgba(245,176,65,.1); border: 1px solid rgba(245,176,65,.3);
+      border-radius: 999px; padding: 6px 16px;
+      font-size: .8rem; font-weight: 600; color: var(--gold);
+      margin-bottom: 24px;
+    }
+    .hero h1 { font-size: clamp(2.2rem, 6vw, 4rem); margin-bottom: 20px; line-height: 1.15; }
+    .hero p  { font-size: 1.15rem; color: var(--text-muted); max-width: 560px; margin: 0 auto 36px; }
+    .hero-cta { display: flex; gap: 12px; justify-content: center; flex-wrap: wrap; }
+
+    /* ── Features ── */
+    .features { padding: 100px 5%; }
+    .features-grid { display: grid; grid-template-columns: repeat(auto-fit,minmax(280px,1fr)); gap: 24px; margin-top: 48px; }
+    .feature-card {
+      padding: 32px 28px;
+      background: var(--card-bg); backdrop-filter: blur(12px);
+      border: 1px solid var(--border); border-radius: var(--radius-lg);
+      transition: all .3s ease;
+    }
+    .feature-card:hover { border-color: rgba(245,176,65,.5); transform: translateY(-4px); box-shadow: 0 12px 40px rgba(245,176,65,.1); }
+    .feature-icon {
+      width: 52px; height: 52px; border-radius: 14px;
+      background: linear-gradient(135deg, rgba(245,176,65,.2), rgba(245,176,65,.05));
+      border: 1px solid rgba(245,176,65,.3);
+      display: flex; align-items: center; justify-content: center;
+      font-size: 1.5rem; margin-bottom: 20px;
+    }
+    .feature-card h3 { font-size: 1.1rem; margin-bottom: 10px; }
+    .feature-card p  { color: var(--text-muted); font-size: .9rem; line-height: 1.7; }
+
+    /* ── Modelos ── */
+    .models { padding: 80px 5%; background: var(--bg2); }
+    .models-grid { display: grid; grid-template-columns: repeat(auto-fit,minmax(260px,1fr)); gap: 20px; margin-top: 48px; }
+    .model-card {
+      padding: 28px; border-radius: var(--radius-lg);
+      border: 1px solid var(--border); background: var(--card-bg);
+      position: relative; transition: all .3s;
+    }
+    .model-card.featured { border-color: var(--gold); box-shadow: 0 0 40px rgba(245,176,65,.15); }
+    .model-card.featured::before {
+      content: '⭐ Mais popular';
+      position: absolute; top: -12px; left: 50%; transform: translateX(-50%);
+      background: var(--gold); color: #0B1120;
+      font-size: .7rem; font-weight: 800; padding: 3px 12px; border-radius: 999px;
+      white-space: nowrap;
+    }
+    .model-card h3 { font-size: 1.15rem; margin-bottom: 6px; }
+    .model-price { font-size: 2rem; font-weight: 800; color: var(--gold); margin: 12px 0; }
+    .model-price span { font-size: 1rem; font-weight: 400; color: var(--text-muted); }
+    .model-features { list-style: none; display: flex; flex-direction: column; gap: 8px; margin: 16px 0 24px; }
+    .model-features li { display: flex; align-items: center; gap: 8px; font-size: .9rem; color: var(--text-muted); }
+    .model-features li::before { content: '✓'; color: var(--gold); font-weight: 700; }
+
+    /* ── CTA Banner ── */
+    .cta-banner {
+      padding: 80px 5%; text-align: center;
+      background: linear-gradient(135deg, rgba(245,176,65,.05), rgba(245,176,65,.02));
+    }
+    .cta-banner h2 { font-size: clamp(1.6rem, 4vw, 2.5rem); margin-bottom: 16px; }
+    .cta-banner p  { color: var(--text-muted); margin-bottom: 32px; }
+
+    /* ── Footer ── */
+    footer {
+      padding: 32px 5%;
+      border-top: 1px solid var(--border);
+      display: flex; align-items: center; justify-content: space-between;
+      flex-wrap: wrap; gap: 12px;
+      color: var(--text-muted); font-size: .85rem;
+    }
+  </style>
+</head>
+<body>
+
+<!-- NAVBAR -->
+<nav class="navbar">
+  <a href="index.html" class="navbar-brand">✦ AUDITCV</a>
+  <div class="navbar-links">
+    <a href="#features" class="nav-link">Funcionalidades</a>
+    <a href="#modelos" class="nav-link">Preços</a>
+    <a href="login.html" class="btn btn-outline btn-sm">Entrar</a>
+    <a href="login.html" class="btn btn-primary btn-sm">Começar grátis</a>
+  </div>
+</nav>
+
+<!-- HERO -->
+<section class="hero">
+  <div>
+    <div class="hero-badge">✦ Powered by Claude IA</div>
+    <h1>O currículo que<br><span class="gradient-text">passa nos filtros ATS</span><br>e encanta recrutadores</h1>
+    <p>Cole seu currículo, informe o cargo desejado e nossa IA reescreve tudo em segundos. Aprovado por +2.000 profissionais.</p>
+    <div class="hero-cta">
+      <a href="login.html" class="btn btn-primary btn-lg">✦ Gerar meu currículo agora</a>
+      <a href="#modelos" class="btn btn-outline btn-lg">Ver planos</a>
+    </div>
+  </div>
+</section>
+
+<!-- FEATURES -->
+<section class="features" id="features">
+  <div style="text-align:center">
+    <h2 style="font-size:clamp(1.6rem,4vw,2.2rem)">Por que o <span class="gradient-text">AUDITCV</span>?</h2>
+    <p class="text-muted mt-8">Tudo que você precisa para conseguir a entrevista dos sonhos</p>
+  </div>
+  <div class="features-grid">
+    <div class="feature-card">
+      <div class="feature-icon">🤖</div>
+      <h3>IA Generativa Avançada</h3>
+      <p>Usamos Claude para reescrever seu currículo com linguagem profissional, palavras-chave e impacto real.</p>
+    </div>
+    <div class="feature-card">
+      <div class="feature-icon">🎯</div>
+      <h3>Otimizado para ATS</h3>
+      <p>Formatação e palavras-chave ajustadas automaticamente para passar nos sistemas de triagem automática.</p>
+    </div>
+    <div class="feature-card">
+      <div class="feature-icon">⚡</div>
+      <h3>Resultado em 30 segundos</h3>
+      <p>Sem cadastro demorado. Faça login com Google e gere seu currículo profissional em menos de um minuto.</p>
+    </div>
+    <div class="feature-card">
+      <div class="feature-icon">📄</div>
+      <h3>3 modelos de currículo</h3>
+      <p>Simples para iniciantes, ATS para sistemas de triagem, e Mágico para vagas competitivas e executivas.</p>
+    </div>
+    <div class="feature-card">
+      <div class="feature-icon">💳</div>
+      <h3>Pague só pelo que usar</h3>
+      <p>Modelo pay-per-use. Sem assinatura mensal. Você gera, nós cobramos apenas o que foi utilizado.</p>
+    </div>
+    <div class="feature-card">
+      <div class="feature-icon">🔒</div>
+      <h3>100% Seguro</h3>
+      <p>Seus dados ficam protegidos com autenticação via Google e banco de dados Supabase com RLS ativado.</p>
+    </div>
+  </div>
+</section>
+
+<!-- MODELOS / PREÇOS -->
+<section class="models" id="modelos">
+  <div style="text-align:center">
+    <h2 style="font-size:clamp(1.6rem,4vw,2.2rem)">Escolha seu <span class="gradient-text">modelo</span></h2>
+    <p class="text-muted mt-8">Pague apenas quando gerar. Sem mensalidades.</p>
+  </div>
+  <div class="models-grid">
+
+    <div class="model-card">
+      <h3>✦ Simples</h3>
+      <p class="text-muted text-sm">Para quem quer um currículo limpo e objetivo</p>
+      <div class="model-price">R$9<span>/geração</span></div>
+      <ul class="model-features">
+        <li>Revisão e reescrita profissional</li>
+        <li>Estrutura padrão ABNT</li>
+        <li>Linguagem adequada ao cargo</li>
+        <li>Entrega em texto formatado</li>
+      </ul>
+      <a href="login.html" class="btn btn-outline w-full">Escolher</a>
+    </div>
+
+    <div class="model-card featured">
+      <h3>✦ ATS Pro</h3>
+      <p class="text-muted text-sm">Para passar nos filtros automáticos</p>
+      <div class="model-price">R$19<span>/geração</span></div>
+      <ul class="model-features">
+        <li>Tudo do plano Simples</li>
+        <li>Palavras-chave do setor</li>
+        <li>Otimização para ATS</li>
+        <li>Score de compatibilidade</li>
+        <li>Dicas personalizadas</li>
+      </ul>
+      <a href="login.html" class="btn btn-primary w-full">Escolher</a>
+    </div>
+
+    <div class="model-card">
+      <h3>✦ IA Mágica</h3>
+      <p class="text-muted text-sm">Para vagas executivas e competitivas</p>
+      <div class="model-price">R$39<span>/geração</span></div>
+      <ul class="model-features">
+        <li>Tudo do ATS Pro</li>
+        <li>Carta de apresentação</li>
+        <li>Reescrita narrativa completa</li>
+        <li>Sugestão de LinkedIn</li>
+        <li>Suporte prioritário</li>
+      </ul>
+      <a href="login.html" class="btn btn-outline w-full">Escolher</a>
+    </div>
+
+  </div>
+</section>
+
+<!-- CTA BANNER -->
+<section class="cta-banner">
+  <h2>Pronto para <span class="gradient-text">conseguir a entrevista</span>?</h2>
+  <p>Mais de 2.000 profissionais já geraram currículos com o AUDITCV. Você é o próximo.</p>
+  <a href="login.html" class="btn btn-primary btn-lg">✦ Começar agora — é rápido</a>
+</section>
+
+<!-- FOOTER -->
+<footer>
+  <span>✦ AUDITCV &copy; 2025 — Todos os direitos reservados</span>
+  <div style="display:flex;gap:20px">
+    <a href="#" class="text-muted">Termos de uso</a>
+    <a href="#" class="text-muted">Privacidade</a>
+    <a href="#" class="text-muted">Contato</a>
+  </div>
+</footer>
+
+</body>
+</html>
